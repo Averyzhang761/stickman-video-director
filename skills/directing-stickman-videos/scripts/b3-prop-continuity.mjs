@@ -3,7 +3,26 @@ import path from 'node:path';
 
 const copy = value => structuredClone(value);
 const stable = value => JSON.stringify(value, (key, item) =>
-  ['id', 'keys', 'motion', 'from', 'to'].includes(key) ? undefined : item);
+  ['id', 'keys', 'motion'].includes(key) ? undefined : item);
+const transitions = {present:['present','disappearing'], disappearing:['absent'],
+  absent:['absent','reappearing'], reappearing:['present']};
+
+export function presenceKeys(state, duration, seconds = 1.2) {
+  if (!(state in transitions) || !Number.isFinite(duration) || duration <= 0 ||
+      !Number.isFinite(seconds) || seconds <= 0) throw Error('invalid presence state or duration');
+  const end = Math.max(.05, duration - .03), change = Math.min(seconds, end);
+  if (state === 'disappearing') return [{t:0,alpha:1},{t:change,alpha:0},{t:end,alpha:0}];
+  if (state === 'reappearing') return [{t:0,alpha:0},{t:change,alpha:1},{t:end,alpha:1}];
+  const alpha = state === 'present' ? 1 : 0;
+  return [{t:0,alpha},{t:end,alpha}];
+}
+
+export function presenceGroup(id, children, event, duration) {
+  if (!id || !Array.isArray(children)) throw Error('presence group needs id and artwork');
+  const keys = presenceKeys(event.state, duration, event.seconds);
+  return {type:'group',id,x:0,y:0,alpha:keys[0].alpha,keys,
+    motion:{role:'prop',reason:event.reason || `Object is ${event.state}`},children:copy(children)};
+}
 
 function layerAt(project, shotIndex, match) {
   const shot = project.shots[shotIndex];
@@ -37,6 +56,10 @@ function template(project, track, name, stack = []) {
 export function reconcileProps(project, plan, repair = false) {
   const problems = [];
   let repaired = 0;
+  if (plan.forbid_cover_blocks) for (const [shotIndex, shot] of project.shots.entries()) {
+    for (const layer of shot.layers) if (layer.type === 'rect' && /vanish|disappear|reappear/i.test(layer.id || ''))
+      problems.push(`shot ${shotIndex}: cover rectangle ${layer.id} must be replaced by motion on the object itself`);
+  }
   for (const rule of plan.absent_layers || []) {
     const shot = project.shots[rule.shot];
     if (!shot || !rule.match || !Object.keys(rule.match).length) throw Error('invalid absent layer rule');
@@ -55,6 +78,17 @@ export function reconcileProps(project, plan, repair = false) {
   }
   for (const track of plan.tracks || []) {
     if (!track.id || !track.states || !Array.isArray(track.instances)) throw Error('prop track needs id, states and instances');
+    if (track.coverage) {
+      const covered = new Set([...track.instances.map(item => item.shot),
+        ...(track.motion_runs || []).flatMap(run => run.shots),
+        ...(track.presence || []).map(event => event.shot)]);
+      for (const [shotIndex, shot] of project.shots.entries()) for (const layer of shot.layers) {
+        const matches = track.layer_id ? layer.id === track.layer_id :
+          track.id_pattern ? new RegExp(track.id_pattern).test(layer.id || '') :
+          layer.type === 'group' && layer.children?.some(child => child.type === 'text' && child.text === track.match_text);
+        if (matches && !covered.has(shotIndex)) problems.push(`${track.id} shot ${shotIndex}: recurring prop appearance is missing from continuity ledger`);
+      }
+    }
     const expected = Object.fromEntries(Object.keys(track.states).map(name => [name, template(project, track, name)]));
     let prior;
     for (const item of track.instances) {
@@ -67,6 +101,24 @@ export function reconcileProps(project, plan, repair = false) {
         if (repair) { layer.children = copy(want); repaired++; }
       }
       prior = item;
+    }
+    let previousPresence;
+    for (const event of track.presence || []) {
+      if (previousPresence && event.shot <= previousPresence.shot) throw Error(`${track.id}: presence events must be ordered`);
+      if (previousPresence && !transitions[previousPresence.state].includes(event.state))
+        problems.push(`${track.id} shot ${event.shot}: invalid presence transition ${previousPresence.state} -> ${event.state}`);
+      if (['disappearing','reappearing'].includes(event.state) && !event.reason)
+        problems.push(`${track.id} shot ${event.shot}: presence change needs a story reason`);
+      const layer = layerAt(project, event.shot, track);
+      if (layer.type !== 'group') throw Error(`${track.id} shot ${event.shot}: presence must animate the object group`);
+      const shot = project.shots[event.shot];
+      const want = presenceKeys(event.state, shot.end - shot.start, event.seconds);
+      const actual = layer.keys?.map(key => ({t:key.t,alpha:key.alpha}));
+      if (JSON.stringify(actual) !== JSON.stringify(want) || layer.alpha !== want[0].alpha) {
+        problems.push(`${track.id} shot ${event.shot}: ${event.state} animation differs`);
+        if (repair) { layer.alpha = want[0].alpha; layer.keys = want; repaired++; }
+      }
+      previousPresence = event;
     }
     for (const run of track.motion_runs || []) {
       if (!Array.isArray(run.shots) || run.shots.length < 1 || !run.axis || !Number.isFinite(run.from) || !Number.isFinite(run.to)) throw Error(`${track.id}: invalid motion run`);

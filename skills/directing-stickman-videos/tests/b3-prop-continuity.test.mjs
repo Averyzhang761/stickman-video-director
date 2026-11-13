@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {reconcileProps} from '../scripts/b3-prop-continuity.mjs';
+import {reconcileProps, presenceGroup} from '../scripts/b3-prop-continuity.mjs';
 
 test('B3 repairs repeated prop artwork and motion resets across cuts', () => {
   const project = {shots:[
@@ -15,6 +15,39 @@ test('B3 repairs repeated prop artwork and motion resets across cuts', () => {
   assert.equal(reconcileProps(project,plan).valid,true);
   assert.equal(project.shots[1].layers[0].children[0].color,'#888');
   assert.equal(project.shots[0].layers[0].keys.at(-1).x,project.shots[1].layers[0].keys[0].x);
+});
+
+test('B3 generates disappear, absent and return states on the object itself', () => {
+  const art = [{type:'rect',fill:'#eee',x:10,y:10,w:20,h:40}];
+  const events = [
+    {shot:0,state:'disappearing',reason:'milk vanishes'},
+    {shot:1,state:'absent'},
+    {shot:2,state:'reappearing',reason:'milk returns'},
+  ];
+  const project = {shots:events.map(event => ({start:event.shot*5,end:(event.shot+1)*5,
+    layers:[presenceGroup(`milk_${event.shot}`,art,event,5)]}))};
+  const plan = {forbid_cover_blocks:true,tracks:[{id:'milk',id_pattern:'^milk_',coverage:true,
+    states:{},instances:[],presence:events}]};
+  assert.equal(reconcileProps(project,plan).valid,true);
+  assert.deepEqual(project.shots[2].layers[0].keys.map(key => key.alpha),[0,1,1]);
+  project.shots[2].layers[0].keys[0].alpha = 1;
+  assert.equal(reconcileProps(project,plan).valid,false);
+  reconcileProps(project,plan,true);
+  assert.equal(reconcileProps(project,plan).valid,true);
+  project.shots[2].layers.push({type:'rect',id:'vanish_cover',fill:'#000'});
+  assert.match(reconcileProps(project,plan).problems.join('; '),/cover rectangle/);
+});
+
+test('B3 keeps timed text reveals distinct from fully visible prop states', () => {
+  const project={shots:[
+    {layers:[{type:'group',id:'page_0',children:[{type:'text',text:'TOTAL',from:.5}]}]},
+    {layers:[{type:'group',id:'page_1',children:[{type:'text',text:'TOTAL'}]}]},
+  ]};
+  const plan={tracks:[{id:'page',id_pattern:'^page_',states:{reveal:{source_shot:0}},
+    instances:[{shot:0,state:'reveal'},{shot:1,state:'reveal'}]}]};
+  assert.equal(reconcileProps(project,plan).valid,false);
+  reconcileProps(project,plan,true);
+  assert.equal(project.shots[1].layers[0].children[0].from,.5);
 });
 
 test('B3 holds a vanished prop state and removes unwanted duplicate objects', () => {
