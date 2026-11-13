@@ -5,7 +5,8 @@ export const JOINTS = ['head', 'neck', 'shoulderL', 'shoulderR', 'elbowL', 'elbo
 export function validatePuppet(layer, span) {
   if (!Array.isArray(layer.poses) || layer.poses.length < 2 || layer.poses.length > 12) throw Error('B3 puppet needs 2–12 complete poses');
   if (layer.headStyle !== undefined && !['solid', 'outline'].includes(layer.headStyle)) throw Error('Invalid B3 puppet head style');
-  if (layer.appearance !== undefined && !['plain', 'cat_archivist'].includes(layer.appearance)) throw Error('Invalid B3 puppet appearance');
+  if (layer.appearance !== undefined && !['plain', 'cat_archivist', 'pictogram_female', 'pictogram_male'].includes(layer.appearance)) throw Error('Invalid B3 puppet appearance');
+  if (layer.profileView !== undefined && !['front', 'side', 'back'].includes(layer.profileView)) throw Error('Invalid B3 pictogram view');
   if (layer.appearance === 'cat_archivist' && layer.headStyle === 'outline') throw Error('Cat archivist needs a solid head');
   if (layer.occludeBelow !== undefined && !Number.isFinite(layer.occludeBelow)) throw Error('Invalid B3 puppet occlusion edge');
   let previous = -1;
@@ -33,6 +34,10 @@ export function puppetJoints(layer, t) {
 
 export function drawPuppet(ctx, layer, t) {
   const j = puppetJoints(layer, t), color = layer.color || '#fafafa', outline = '#050505';
+  if (layer.appearance === 'pictogram_female' || layer.appearance === 'pictogram_male') {
+    drawPictogram(ctx, layer, j, color, outline);
+    return;
+  }
   const stroke = (points, width) => {
     ctx.beginPath(); ctx.moveTo(...j[points[0]]);
     for (const name of points.slice(1)) ctx.lineTo(...j[name]);
@@ -104,4 +109,46 @@ export function drawPuppet(ctx, layer, t) {
     ctx.strokeStyle = layer.headStyle === 'outline' ? color : outline;
     ctx.lineWidth = 17; ctx.stroke();
   }
+}
+
+function drawPictogram(ctx, layer, j, color, outline) {
+  const side = layer.profileView === 'side';
+  const male = layer.appearance === 'pictogram_male';
+  const strokeLimb = (names, width) => {
+    ctx.beginPath(); ctx.moveTo(...j[names[0]]);
+    for (const name of names.slice(1)) ctx.lineTo(...j[name]);
+    ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    ctx.strokeStyle = outline; ctx.lineWidth = width + 17; ctx.stroke();
+    ctx.strokeStyle = color; ctx.lineWidth = width; ctx.stroke();
+  };
+  ctx.save();
+  if (layer.occludeBelow !== undefined) {
+    ctx.beginPath(); ctx.rect(-5000,-5000,10000,5000 + layer.occludeBelow); ctx.clip();
+  }
+  for (const s of ['L','R']) {
+    strokeLimb([`hip${s}`,`knee${s}`,`foot${s}`],side ? 47 : 52);
+    const [x,y] = j[`foot${s}`];
+    ctx.beginPath(); ctx.moveTo(x-22,y+3); ctx.lineTo(x+22,y+3);
+    ctx.strokeStyle=outline;ctx.lineWidth=46;ctx.lineCap='round';ctx.stroke();
+    ctx.strokeStyle=color;ctx.lineWidth=30;ctx.stroke();
+  }
+  if (side) strokeLimb(['shoulderL','elbowL','handL'],40);
+  else for (const s of ['L','R']) strokeLimb([`shoulder${s}`,`elbow${s}`,`hand${s}`],44);
+  strokeLimb(['neck','head'],55);
+  const left=j.shoulderL,right=j.shoulderR,hipL=j.hipL,hipR=j.hipR;
+  const shoulder=[(left[0]+right[0])/2,(left[1]+right[1])/2];
+  const hip=[(hipL[0]+hipR[0])/2,(hipL[1]+hipR[1])/2];
+  const torsoWidth=side?104:male?130:118;
+  ctx.beginPath();ctx.moveTo(...shoulder);ctx.lineTo(...hip);
+  ctx.lineCap='round';ctx.lineJoin='round';
+  ctx.strokeStyle=outline;ctx.lineWidth=torsoWidth+17;ctx.stroke();
+  ctx.strokeStyle=color;ctx.lineWidth=torsoWidth;ctx.stroke();
+  if (side) strokeLimb(['shoulderR','elbowR','handR'],44);
+  const [hx,hy]=j.head;
+  ctx.beginPath();ctx.arc(hx,hy,65,0,Math.PI*2);ctx.fillStyle=color;ctx.fill();
+  ctx.strokeStyle=outline;ctx.lineWidth=17;ctx.stroke();
+  if (side) {
+    ctx.beginPath();ctx.arc(hx+42,hy-3,8,0,Math.PI*2);ctx.fillStyle=outline;ctx.fill();
+  }
+  ctx.restore();
 }

@@ -3,9 +3,9 @@ import {fileURLToPath} from 'node:url';
 
 // A short, screen-fixed B3 chapter card. Add the returned layers at the end
 // of the opening shot for that chapter; narration and captions keep their timing.
-export function makeChapterCard({number, total, title, until = 1.4}) {
-  if (!Number.isInteger(number) || !Number.isInteger(total) || number < 1 || total < number || total > 10)
-    throw Error('B3 chapter card needs a valid number and total (max 10)');
+export function makeChapterCard({number, total, title, until = 1.4, showProgress = true}) {
+  if (!Number.isInteger(number) || !Number.isInteger(total) || number < 1 || total < number || total > 12)
+    throw Error('B3 chapter card needs a valid number and total (max 12)');
   if (typeof title !== 'string' || !title.trim() || title.length > 30)
     throw Error('B3 chapter card title must be 1–30 characters');
   if (!Number.isFinite(until) || until < .5 || until > 3) throw Error('B3 chapter card hold must be 0.5–3 seconds');
@@ -19,7 +19,7 @@ export function makeChapterCard({number, total, title, until = 1.4}) {
     fixed({type: 'text', text: String(number), x: 850, y: 748, size: 165, color: black, bold: true}),
     fixed({type: 'line', points: [[220, 1045], [1060, 1045]], color: '#d32331', lineWidth: 8}),
     fixed({type: 'text', text: title.trim().toUpperCase(), x: 160, y: 1115, w: 960, size: 72, color: ink, bold: true}),
-    ...Array.from({length: total}, (_, i) => {
+    ...(showProgress ? Array.from({length: total}, (_, i) => {
       const x = left + i * (box + gap), active = i + 1 === number;
       return [
         fixed({type: 'rect', x, y: 1350, w: box, h: box, fill: active ? ink : black,
@@ -27,7 +27,7 @@ export function makeChapterCard({number, total, title, until = 1.4}) {
         fixed({type: 'text', text: String(i + 1), x: x + 21, y: 1355, size: 46,
           color: active ? black : dim, bold: true})
       ];
-    }).flat()
+    }).flat() : [])
   ];
 }
 

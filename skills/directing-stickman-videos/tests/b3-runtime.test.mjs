@@ -4,13 +4,20 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {spawnSync} from 'node:child_process';
+import {createCanvas} from '@napi-rs/canvas';
 import {ROOT, FFMPEG, run, save, loadProject, hashFile} from '../scripts/autopilot-core.mjs';
 import {painter, render} from '../scripts/autopilot-render.mjs';
 import {validateB3} from '../scripts/b3-graphics.mjs';
 import {makeChapterCard} from '../scripts/b3-chapter-card.mjs';
+import {makeChapterProgress,stampSeriesChrome} from '../scripts/b3-chapter-progress.mjs';
 import {makeOpeningSignal} from '../scripts/b3-opening-signal.mjs';
 import {makeUniversalOutro} from '../scripts/b3-universal-outro.mjs';
+import {buildOutroProject} from '../scripts/b3-build-outro-project.mjs';
+import {finishSuspenseSeries} from '../scripts/b3-series-finish.mjs';
+import {lockCharacterStyle} from '../scripts/b3-lock-character-style.mjs';
 import {makeSeriesBug, stampSeriesBug} from '../scripts/b3-series-bug.mjs';
+import {neutralPose} from '../scripts/b3-acting.mjs';
+import {drawPuppet,validatePuppet} from '../scripts/b3-puppet.mjs';
 
 function fixture(t) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'stickman-b3-test-'));
@@ -134,6 +141,59 @@ test('B3 chapter card supplies a bounded progress marker', () => {
   assert.throws(() => makeChapterCard({number: 9, total: 8, title: 'BAD'}), /number/);
 });
 
+test('B3 pictogram actor has a filled torso and two visible feet', () => {
+  const joints=neutralPose();
+  for(const appearance of ['pictogram_female','pictogram_male']){
+    const layer={type:'puppet',appearance,profileView:'front',color:'#fafafa',
+      poses:[{t:0,joints},{t:1,joints}]};
+    assert.doesNotThrow(()=>validatePuppet(layer,1));
+    const canvas=createCanvas(640,800),ctx=canvas.getContext('2d');
+    ctx.fillStyle='#020202';ctx.fillRect(0,0,640,800);
+    ctx.save();ctx.translate(320,680);drawPuppet(ctx,layer,0);ctx.restore();
+    const value=(x,y)=>ctx.getImageData(x,y,1,1).data[0];
+    assert.ok(value(320,350)>180,'torso is filled');
+    assert.ok(value(265,680)>180,'left foot is visible');
+    assert.ok(value(375,680)>180,'right foot is visible');
+    assert.ok(value(320,680)<50,'legs remain distinct');
+  }
+});
+
+test('B3 character lock fixes both roles without changing animation or props', () => {
+  const pose={t:0,joints:neutralPose()};
+  const project={shots:[{layers:[
+    {type:'puppet',id:'she',appearance:'plain',color:'#aaaaaa',poses:[pose]},
+    {type:'puppet',id:'he',characterGender:'male',appearance:'plain',poses:[pose]},
+    {type:'rect',id:'prop',fill:'#aaaaaa'}]}]};
+  const out=lockCharacterStyle(project);
+  assert.equal(out.shots[0].layers[0].appearance,'pictogram_female');
+  assert.equal(out.shots[0].layers[1].appearance,'pictogram_male');
+  assert.ok(out.shots[0].layers.slice(0,2).every(l=>l.color==='#fafafa'&&l.headStyle==='solid'));
+  assert.deepEqual(out.shots[0].layers[0].poses,[pose]);
+  assert.deepEqual(out.shots[0].layers[2],project.shots[0].layers[2]);
+  assert.equal(project.shots[0].layers[0].appearance,'plain');
+});
+
+test('B3 chapter boxes persist across story shots and follow actual chapter starts', () => {
+  const project={style:'B3',fps:24,series:{},shots:Array.from({length:4},(_,i)=>({
+    start:i*2,end:(i+1)*2,layers:[{type:'rect',x:0,y:0,w:1280,h:2276,fill:'#020202'}]}))};
+  const chapters=[{shot:0,title:'THE SLIP'},{shot:2,title:'THE LOSSES'}];
+  const out=finishSuspenseSeries(project,{channelName:'Index Nine',fileNumber:1,chapters});
+  assert.deepEqual(out.series.chapters,chapters);
+  for(const [i,shot] of out.shots.entries()){
+    const boxes=shot.layers.filter(l=>l.seriesChrome==='chapter_progress'&&l.type==='rect');
+    assert.equal(boxes.length,2);
+    assert.equal(boxes.findIndex(l=>l.fill==='#fafafa'),i<2?0:1);
+    assert.equal(shot.layers.filter(l=>l.text==='FILE 001  //  INDEX NINE').length,1);
+    assert.ok(boxes.every(l=>l.screenFixed));
+  }
+  assert.equal(out.shots[0].layers.at(-1).to,8/24,'opening fault still covers the first frames');
+  assert.equal(out.shots[2].layers.at(-1).seriesChrome,'chapter_progress',
+    'persistent boxes remain visible on the chapter card');
+  assert.equal(makeChapterProgress({number:7,total:9}).filter(l=>l.type==='rect').length,9);
+  assert.throws(()=>stampSeriesChrome(project.shots,{channelName:'Index Nine',fileNumber:1,
+    chapters:[{shot:0,title:'A'},{shot:0,title:'B'}]}),/increase/);
+});
+
 test('B3 opening signal covers the reference-length heavy fault before the case card', () => {
   const a = makeOpeningSignal({fps:24}), b = makeOpeningSignal({fps:30});
   assert.equal(a.event.frames, 8); assert.equal(b.event.frames, 10);
@@ -159,6 +219,34 @@ test('B3 universal outro has a full cat-woman presenter and story-independent la
   assert.ok(outro.shots[0].layers.some(l=>l.type==='text'&&l.text==='DEPT. OF FELINE AFFAIRS'));
   for (const shot of outro.shots) assert.doesNotThrow(()=>validateB3(shot.layers));
   assert.throws(()=>makeUniversalOutro({nextFile:1}),/next file/);
+});
+
+test('B3 branded outro isolates the human-hand identity frame from the three head-turn poses', () => {
+  const template = {style:'B3',width:1080,height:1920,television:{enabled:false},series:{}};
+  const p = buildOutroProject(template,{channelName:'Index Nine',nextFile:2,
+    identityImage:'identity.png',headSideImage:'side.png',headMidImage:'mid.png',headTurnImage:'front.png'});
+  const layers = p.shots[0].layers;
+  assert.equal(layers.find(l=>l.id==='identity_frame').to,2.2);
+  assert.equal(layers.find(l=>l.id==='identity_head_side').from,2.2);
+  assert.equal(layers.find(l=>l.id==='identity_head_mid').from,2.52);
+  assert.equal(layers.find(l=>l.id==='identity_head_front').from,2.84);
+  assert.ok(!layers.some(l=>l.type==='rect' && l.from===2.2), 'No head-cover rectangle can cut the neck');
+  assert.equal(p.shots[2].kind,'end_card');
+  assert.equal(p.series.channel_name,'Index Nine');
+  assert.throws(()=>makeUniversalOutro({nextFile:2,channelName:'Index Nine',headSideImage:'side.png'}),/middle head/);
+});
+
+test('B3 series finishing stamps all authored shots and adds chapter cards only at plot turns', () => {
+  const project = {style:'B3',fps:24,series:{},shots:[
+    {start:0,end:2,layers:[{type:'rect',fill:'#020202'},{type:'text',text:'FILE 001  //  OLD',y:88}]},
+    {start:2,end:4,layers:[{type:'rect',fill:'#020202'},{type:'text',text:'FILE 001  //  OLD',y:88}]}
+  ]};
+  const p = finishSuspenseSeries(project,{channelName:'Index Nine',fileNumber:1,
+    chapters:[{shot:0,title:'THE SLIP'},{shot:1,title:'THE LOSSES'}]});
+  assert.ok(p.shots.every(s=>s.layers.filter(l=>l.text==='FILE 001  //  INDEX NINE').length===1));
+  assert.ok(p.shots.every(s=>s.layers.some(l=>l.text==='FILE')));
+  assert.equal(p.television.events[0].frames,8);
+  assert.equal(p.shots[0].layers.at(-1).to,8/24);
 });
 
 test('B3 episode bug repeats the file identity on every story shot', () => {

@@ -18,9 +18,26 @@ try {
   let bug;
   try { bug = makeSeriesBug({fileNumber:p.series.file_number,channelName:p.series.channel_name}); }
   catch { fail('series.channel_name and series.file_number are required'); }
-  for (const shot of p.shots.filter(s => !['universal_outro','end_card'].includes(s.kind))) {
+  const chapters=p.series.chapters;
+  if(p.series.character_style==='solid_pictogram_v1') {
+    for(const [index,shot] of p.shots.entries()) for(const layer of shot.layers) {
+      if(layer.type==='puppet'&&(!['pictogram_female','pictogram_male'].includes(layer.appearance)||layer.color!=='#fafafa'||layer.headStyle!=='solid'))
+        fail(`shot ${index} has a puppet outside the locked white-fill/black-outline character style`);
+    }
+  }
+  if(!Array.isArray(chapters)||!chapters.length||chapters[0].shot!==0||chapters.length>12||
+    chapters.some((c,i)=>!Number.isInteger(c.shot)||c.shot<0||c.shot>=p.shots.length||
+      (i>0&&c.shot<=chapters[i-1].shot)||!c.title))fail('ordered story chapter starts are required');
+  let activeChapter=0;
+  for (const [index,shot] of p.shots.entries()) {
+    if(['universal_outro','end_card'].includes(shot.kind))continue;
+    if(activeChapter+1<chapters.length&&index===chapters[activeChapter+1].shot)activeChapter++;
     if (!shot.layers.some(l => l.type === 'text' && l.screenFixed && l.text === bug.text))
       fail(`story shot at ${shot.start}s lacks the current file/channel identifier`);
+    const boxes=shot.layers.filter(l=>l.seriesChrome==='chapter_progress'&&l.type==='rect');
+    if(boxes.length!==chapters.length||boxes.filter(l=>l.fill==='#fafafa').length!==1||
+      boxes[activeChapter].fill!=='#fafafa'||boxes.some(l=>!l.screenFixed))
+      fail(`story shot at ${shot.start}s lacks its current chapter progress boxes`);
   }
   if (!['placeholder', 'approved'].includes(p.series.voice_status)) fail('voice_status must be placeholder or approved');
   const score = [...p.score].sort((a, b) => a.start - b.start);
@@ -59,7 +76,7 @@ try {
       if (!joints || Math.min(distance('L'), distance('R')) > 30) fail(`puppet ${l.id} misses its declared contact point`);
     }
   }
-  const out = {valid: true, title: p.series.title, channel_name:p.series.channel_name, file_number:p.series.file_number, duration: p.duration, picture: `${p.width}x${p.height}`, cover: path.basename(cover), score_segments: score.length, actor_motion_shots: actorShots, contact_performances: contactActors.length, acting_ledger_entries: ledger.length, voice_status: p.series.voice_status, delivery_ready: false, human_review: 'acting, music, captions, cover and rights remain required'};
+  const out = {valid: true, title: p.series.title, channel_name:p.series.channel_name, file_number:p.series.file_number, chapter_count:chapters.length, chapter_guidance:chapters.length>=7&&chapters.length<=9?'within preferred 7–9 for 8–9 minutes':'review the story beats; 7–9 is preferred, not required', duration: p.duration, picture: `${p.width}x${p.height}`, cover: path.basename(cover), score_segments: score.length, actor_motion_shots: actorShots, contact_performances: contactActors.length, acting_ledger_entries: ledger.length, voice_status: p.series.voice_status, delivery_ready: false, human_review: 'acting, music, captions, cover and rights remain required'};
   console.log(JSON.stringify(out, null, 2));
 } catch (error) {
   console.error(error.message);
