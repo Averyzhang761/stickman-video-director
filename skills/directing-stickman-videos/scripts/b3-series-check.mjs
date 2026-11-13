@@ -3,6 +3,7 @@ import path from 'node:path';
 import {loadProject, mediaPath, probe} from './autopilot-core.mjs';
 import {walkLayers} from './b3-graphics.mjs';
 import {makeSeriesBug} from './b3-series-bug.mjs';
+import {reconcileProps} from './b3-prop-continuity.mjs';
 
 function fail(message) { throw new Error(`B3 series: ${message}`); }
 const file = process.argv[2];
@@ -57,6 +58,11 @@ try {
   if (coverStream?.width !== 1080 || coverStream?.height !== 1920) fail('cover must be 1080×1920');
   const ledger = JSON.parse(fs.readFileSync(local(p.series.acting_ledger), 'utf8'));
   if (!Array.isArray(ledger)) fail('acting_ledger must be an array');
+  if (!p.series.prop_continuity) fail('series.prop_continuity ledger required before rendering');
+  const plan = JSON.parse(fs.readFileSync(local(p.series.prop_continuity), 'utf8'));
+  if (!Array.isArray(plan.tracks) || !plan.tracks.length) fail('prop continuity ledger needs tracked story elements');
+  const continuity = reconcileProps(p, plan);
+  if (!continuity.valid) fail(`prop continuity failed: ${continuity.problems.join('; ')}`);
   if (!p.score.length || new Set(p.score.map(s => s.source)).size < 2) fail('at least two distinct score segments required');
   if (score[0].start > .002 || score.at(-1).end < p.duration - .002) fail('score does not span the film');
   for (let i = 1; i < score.length; i++) if (score[i].start > score[i - 1].end + .002) fail('score has an uncovered gap');
