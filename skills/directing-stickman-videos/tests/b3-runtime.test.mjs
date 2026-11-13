@@ -148,12 +148,15 @@ test('B3 universal outro has a full cat-woman presenter and story-independent la
   assert.equal(outro.shots[0].start,20);
   assert.equal(outro.shots[2].end,30);
   assert.equal(outro.shots[2].kind,'end_card');
-  assert.equal(outro.shots[0].layers.find(l=>l.type==='puppet').appearance,'cat_archivist');
+  const host = outro.shots[0].layers.find(l=>l.id==='cat_archivist_20000');
+  assert.equal(host.type,'group');
+  assert.ok(host.children.some(l=>l.id==='cat_archivist_20000_head'), 'The recurring host has an independently animated head');
+  assert.ok(host.children.some(l=>l.id==='cat_archivist_20000_hand'), 'The recurring host has an independently animated file hand');
   assert.match(outro.shots[0].layers.find(l=>l.type==='text').text,/NIGHT INDEX/);
   assert.match(outro.shots[2].layers.find(l=>l.type==='text'&&l.text.startsWith('NEXT')).text,/009/);
   assert.ok(outro.shots[1].layers.some(l=>l.type==='group'), 'Institutional paw seal appears before the last card');
   assert.ok(outro.shots[2].layers.some(l=>l.type==='group'), 'Smaller paw print marks the upper right of the last card');
-  assert.ok(outro.shots[0].layers.some(l=>l.type==='text'&&l.text==='DEPARTMENT OF OPEN CASES'));
+  assert.ok(outro.shots[0].layers.some(l=>l.type==='text'&&l.text==='DEPT. OF FELINE AFFAIRS'));
   for (const shot of outro.shots) assert.doesNotThrow(()=>validateB3(shot.layers));
   assert.throws(()=>makeUniversalOutro({nextFile:1}),/next file/);
 });

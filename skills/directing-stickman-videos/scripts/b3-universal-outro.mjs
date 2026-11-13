@@ -1,6 +1,6 @@
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
-import {makePuppet} from './b3-acting.mjs';
+import {makeCatArchivist} from './b3-cat-archivist.mjs';
 
 function pawPrint(x, y, scale = 1, ring = false) {
   const circle = (dx,dy,w,h) => ({type:'ellipse',x:dx,y:dy,w,h,fill:'#fafafa',stroke:'#050505',lineWidth:9});
@@ -22,10 +22,8 @@ export function makeUniversalOutro({start = 0, nextFile = 2, channelName} = {}) 
   if (typeof channelName !== 'string' || !/^[A-Za-z][A-Za-z0-9 ]{1,21}$/.test(channelName.trim()))
     throw Error('B3 universal outro needs a channel name');
   const black = {type:'rect',x:0,y:0,w:1280,h:2276,fill:'#020202'};
-  const presenter = makePuppet({id:`cat_archivist_${Math.round(start * 1000)}`,
-    action:'inspect',reason:'The archivist turns toward the viewer before closing the transmission',
-    objective:'make the institution feel unexpectedly personal',x:315,y:1815,scale:1.7,duration:4.5,
-    appearance:'cat_archivist'});
+  const presenter = makeCatArchivist({id:`cat_archivist_${Math.round(start * 1000)}`,
+    x:90,y:685,scale:1.05,duration:4.5});
   const seal = pawPrint(640,1010,1,true);
   seal.id = `archive_seal_${Math.round(start * 1000)}`;
   seal.motion = {role:'prop',reason:'The institutional paw seal stamps into view after the identity slate'};
@@ -39,10 +37,11 @@ export function makeUniversalOutro({start = 0, nextFile = 2, channelName} = {}) 
         black,
         {type:'text',text:`${channelName.trim().toUpperCase()} // TRANSMISSION`,x:70,y:105,size:36,color:'#bcbcbc',tracking:3,fontRole:'tag',screenFixed:true},
         presenter,
-        {type:'rect',x:0,y:1460,w:1280,h:600,fill:'#020202'},
         pawPrint(955,1110,1.05,true),
-        {type:'text',text:'DEPARTMENT OF OPEN CASES',x:670,y:1370,w:545,size:35,
-          color:'#c5c5c5',tracking:2,fontRole:'tag',align:'center',screenFixed:true}
+        {type:'text',text:'DEPT. OF FELINE AFFAIRS',x:655,y:1365,w:570,size:30,
+          color:'#d5d5d5',tracking:1.2,fontRole:'tag',align:'center',screenFixed:true},
+        {type:'text',text:'OPEN CASES DIVISION',x:655,y:1425,w:570,size:25,
+          color:'#777777',tracking:2,fontRole:'tag',align:'center',screenFixed:true}
       ]},
       {start:start + 4.5,end:start + 5.7,kind:'universal_outro',layers:[
         black,seal,
