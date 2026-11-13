@@ -7,6 +7,7 @@ import {spawnSync} from 'node:child_process';
 import {ROOT, FFMPEG, run, save, loadProject, hashFile} from '../scripts/autopilot-core.mjs';
 import {painter, render} from '../scripts/autopilot-render.mjs';
 import {validateB3} from '../scripts/b3-graphics.mjs';
+import {makeChapterCard} from '../scripts/b3-chapter-card.mjs';
 
 function fixture(t) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'stickman-b3-test-'));
@@ -90,6 +91,29 @@ test('B3 signal grain is frame-varying and reproducible', async t => {
   assert.deepEqual(first, Buffer.from(draw(.2).data()));
   assert.notDeepEqual(first, Buffer.from(draw(.3).data()));
   assert.throws(() => validateB3(f.project.shots[0].layers, {events: [{time: .2, kind: 'unknown'}]}), /event/);
+});
+
+test('B3 snow burst appears only on declared frames', async t => {
+  const f = fixture(t);
+  f.project.shots[0].layers = [{type: 'rect', x: 400, y: 200, w: 100, h: 100, fill: '#ffffff'}];
+  f.project.television = {enabled: true, intensity: 1, grain: 0, flicker: 0,
+    events: [{time: .333, kind: 'snow', frames: 3}]};
+  save(f.file, f.project); const draw = await painter(loadProject(f.file));
+  const clean = Buffer.from(draw(.15).data());
+  assert.deepEqual(clean, Buffer.from(draw(.583).data()), 'No signal texture outside the event');
+  assert.notDeepEqual(clean, Buffer.from(draw(.333).data()), 'Signal burst must be visible at its cue');
+  assert.notDeepEqual(Buffer.from(draw(.333).data()), Buffer.from(draw(.417).data()), 'Burst frames should differ');
+  assert.throws(() => validateB3(f.project.shots[0].layers,
+    {events: [{time: .2, kind: 'snow', frames: 7}]}), /frames/);
+});
+
+test('B3 chapter card supplies a bounded progress marker', () => {
+  const layers = makeChapterCard({number: 2, total: 8, title: 'THE LOSSES', until: 1.4});
+  assert.equal(layers.length, 22);
+  assert.ok(layers.every(l => l.screenFixed && l.to === 1.4));
+  assert.equal(layers.filter(l => l.type === 'rect' && l.fill === '#fafafa').length, 2);
+  assert.doesNotThrow(() => validateB3(layers));
+  assert.throws(() => makeChapterCard({number: 9, total: 8, title: 'BAD'}), /number/);
 });
 
 test('B3 validates bounded declarative artwork and rejects cross-style leakage', t => {
