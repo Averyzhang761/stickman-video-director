@@ -107,6 +107,17 @@ test('B3 snow burst appears only on declared frames', async t => {
     {events: [{time: .2, kind: 'snow', frames: 7}]}), /frames/);
 });
 
+test('B3 object glow lights only the nearby scene', async t => {
+  const f = fixture(t);
+  f.project.shots[0].layers = [{type: 'rect', x: 300, y: 200, w: 40, h: 40,
+    fill: '#ffffff', glow: 55, glowColor: '#e7c86d'}];
+  save(f.file, f.project); const draw = await painter(loadProject(f.file));
+  const lit = draw(.2);
+  assert.ok(pixel(lit, 140, 111)[0] > 17, 'Object light should spill beyond its outline');
+  assert.deepEqual(pixel(lit, 5, 5), [17, 19, 22, 255], 'Far background should stay dark');
+  assert.throws(() => validateB3([{type: 'rect', w: 10, h: 10, glow: 201}]), /glow/);
+});
+
 test('B3 chapter card supplies a bounded progress marker', () => {
   const layers = makeChapterCard({number: 2, total: 8, title: 'THE LOSSES', until: 1.4});
   assert.equal(layers.length, 22);

@@ -41,7 +41,8 @@ export function validateB3(layers, television) {
       for (const k of ['pivotX', 'pivotY', 'radius']) if (l[k] !== undefined) finite(l[k], k, k === 'radius' ? 0 : -10000);
       if (l.screenFixed !== undefined && typeof l.screenFixed !== 'boolean') throw new Error('B3 screenFixed must be boolean');
       for (const k of ['scaleX', 'scaleY']) if (l[k] !== undefined) finite(l[k], k, 0.001, 100);
-      for (const k of ['fill', 'stroke', 'color']) if (l[k] !== undefined && (typeof l[k] !== 'string' || !/^(?:#(?:[a-f\d]{3}|[a-f\d]{4}|[a-f\d]{6}|[a-f\d]{8})|rgba?\([\d\s.,%]+\)|[a-z]{1,20})$/i.test(l[k]))) throw new Error('Invalid B3 color');
+      for (const k of ['fill', 'stroke', 'color', 'glowColor']) if (l[k] !== undefined && (typeof l[k] !== 'string' || !/^(?:#(?:[a-f\d]{3}|[a-f\d]{4}|[a-f\d]{6}|[a-f\d]{8})|rgba?\([\d\s.,%]+\)|[a-z]{1,20})$/i.test(l[k]))) throw new Error('Invalid B3 color');
+      if (l.glow !== undefined) finite(l.glow, 'glow', 0, 200);
       for (const k of ['alpha', 'progress']) if (l[k] !== undefined) finite(l[k], k, 0, 1);
       if (l.lineWidth !== undefined) finite(l.lineWidth, 'line width', 0.001, 200);
       if (l.type === 'group') visit(l.children, depth + 1);
@@ -71,6 +72,11 @@ export function validateB3(layers, television) {
   }
 }
 export function drawB3Shape(ctx, l) {
+  ctx.save();
+  if (l.glow) {
+    ctx.shadowColor = l.glowColor || l.fill || l.stroke || '#ffffff';
+    ctx.shadowBlur = l.glow;
+  }
   ctx.beginPath();
   if (l.type === 'path') for (const [op, ...v] of l.commands) {
     if (op === 'M') ctx.moveTo(...v);
@@ -83,6 +89,7 @@ export function drawB3Shape(ctx, l) {
   else ctx.ellipse(l.w / 2, l.h / 2, l.w / 2, l.h / 2, 0, 0, Math.PI * 2);
   if (l.fill !== 'none') { ctx.fillStyle = l.fill || '#dedfdf'; ctx.fill(); }
   if (l.stroke && l.stroke !== 'none') { ctx.strokeStyle = l.stroke; ctx.lineWidth = l.lineWidth ?? 3; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.stroke(); }
+  ctx.restore();
 }
 export function televisionFinish(ctx, source, width, height, intensity = 0.45, options = {}) {
   if (!intensity) return;
