@@ -21,13 +21,28 @@ export function appendB3Outro(story, outro, output, {replace=false} = {}) {
   if (fs.existsSync(output) && !replace) throw Error('B3 output exists; pass --replace to overwrite it');
   if ([story,outro].some(file => path.resolve(file) === path.resolve(output))) throw Error('B3 output must differ from its inputs');
   const a = probe(story), b = probe(outro);
-  if (signature(a) !== signature(b)) throw Error('B3 story and outro codecs, size, frame rate and audio layout must match');
+  const storyAudio = a.streams.find(s => s.codec_type === 'audio');
+  const outroAudio = b.streams.find(s => s.codec_type === 'audio');
+  let joinedOutro = outro;
+  const conformed = `${output}.outro-conformed.mp4`;
+  if (signature(a) !== signature(b)) {
+    const compatible = a.streams.length === b.streams.length && storyAudio && outroAudio &&
+      storyAudio.codec_name === outroAudio.codec_name && storyAudio.channels === outroAudio.channels &&
+      a.streams.find(s => s.codec_type === 'video')?.codec_name === b.streams.find(s => s.codec_type === 'video')?.codec_name &&
+      a.streams.find(s => s.codec_type === 'video')?.width === b.streams.find(s => s.codec_type === 'video')?.width &&
+      a.streams.find(s => s.codec_type === 'video')?.height === b.streams.find(s => s.codec_type === 'video')?.height &&
+      a.streams.find(s => s.codec_type === 'video')?.r_frame_rate === b.streams.find(s => s.codec_type === 'video')?.r_frame_rate;
+    if (!compatible) throw Error('B3 story and outro video codec, size, frame rate and audio channels must match');
+    command('ffmpeg',['-v','error','-y','-i',outro,'-map','0:v:0','-map','0:a:0','-c:v','copy','-c:a','aac','-ar',storyAudio.sample_rate,'-ac',String(storyAudio.channels),'-b:a','192k',conformed]);
+    joinedOutro = conformed;
+    if (signature(a) !== signature(probe(joinedOutro))) throw Error('B3 outro audio resampling did not match the story');
+  }
   if (a.streams.find(s=>s.codec_type==='video')?.width !== 1080 ||
     a.streams.find(s=>s.codec_type==='video')?.height !== 1920) throw Error('B3 series output must be native 1080x1920');
   const list = `${output}.ffconcat`;
-  fs.writeFileSync(list,`${concatPath(story)}\n${concatPath(outro)}\n`);
+  fs.writeFileSync(list,`${concatPath(story)}\n${concatPath(joinedOutro)}\n`);
   try { command('ffmpeg',['-v','error','-y','-f','concat','-safe','0','-i',list,'-c','copy','-movflags','+faststart',output]); }
-  finally { fs.rmSync(list,{force:true}); }
+  finally { fs.rmSync(list,{force:true}); fs.rmSync(conformed,{force:true}); }
   const final = probe(output);
   const duration = Number(final.format.duration);
   if (duration < 480 || duration > 540) throw Error(`B3 film including outro is ${duration}s, outside 8–9 minutes`);
