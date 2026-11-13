@@ -67,7 +67,9 @@ An illustrative **layer excerpt**, not a complete film or a reusable character:
 ]}
 ```
 
-Top-level `television: {enabled: true, intensity: 0.45}` enables soft bloom, subtle scanlines and vignette once after scene composition, **before clean captions**. Intensity ranges from 0 to 1; set `enabled: false` for clean interaction checks. This treatment belongs only to B3. Meaningful object/scene action, varied compositions and faithful contact still require authored decisions and encoded playback review; treatment cannot rescue a static illustration.
+Top-level `television: {enabled: true, intensity: 0.75, grain: 0.8, flicker: 0.7, events: [{time: 2.75, kind: "line"}, {time: 20.333, kind: "rgb"}]}` adds deterministic frame-varying specks and slight brightness fluctuation to B3's bloom, scanlines and vignette. `intensity`, `grain` and `flicker` each range from 0 to 1. Events are absolute seconds: `line` is a one-frame broken horizontal signal, `rgb` a one-frame color separation. Use them at motivated beats, not continuously. The television finish runs after scene composition, **before clean captions**. Set `enabled: false` for clean interaction checks. These settings belong only to B3. Meaningful object/scene action, varied compositions and faithful contact still require authored decisions and encoded playback review; treatment cannot rescue a static illustration.
+
+For a B3 shot, `camera: {from: 1, to: 1.05, pivotX: 640, pivotY: 1060}` slowly pushes the scene across that shot using smoothstep timing. Set `screenFixed: true` on top-level title/status layers that should stay in screen coordinates; captions are screen-fixed automatically. Vary or omit the push when the viewer must read an information card. Camera motion does not satisfy the local-action gate.
 
 ## B1–B4 caption and motion checks
 

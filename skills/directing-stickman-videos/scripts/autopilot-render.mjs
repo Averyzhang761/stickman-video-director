@@ -64,7 +64,10 @@ export async function painter(p, {pictureOnly = false} = {}) {
       for (let y = 16.5; y < captionBand; y += 64) { ctx.moveTo(0, y); ctx.lineTo(plane.width, y); } ctx.stroke();
     }
     const shot = p.shots.find(s => t >= s.start && t < s.end) || p.shots.at(-1);
-    function paintLayers(layers, selectedParent = false) { for (const layer of layers) {
+    const cameraProgress = clamp((t - shot.start) / (shot.end - shot.start));
+    const cameraEase = cameraProgress * cameraProgress * (3 - 2 * cameraProgress);
+    const cameraScale = shot.camera ? shot.camera.from + (shot.camera.to - shot.camera.from) * cameraEase : 1;
+    function paintLayers(layers, selectedParent = false, depth = 0) { for (const layer of layers) {
       if (omitIds.includes(layer.id)) continue;
       if (principalMotionOnly && ['text', 'shadow'].includes(layer.type)) continue;
       const selected = selectedParent || focusIds.includes(layer.id);
@@ -78,10 +81,15 @@ export async function painter(p, {pictureOnly = false} = {}) {
       const l = keyState(layer, localTime), x = l.x || 0, y = l.y || 0, w = l.w || 200;
       // Used by the diagnostic to compare the actual settle with a frozen title.
       if (hookSettled && l.b4Hook === 'payoff') { l.scaleX = 1; l.scaleY = 1; }
-      ctx.save(); ctx.globalAlpha *= clamp(l.alpha ?? 1); ctx.translate(x, y);
+      ctx.save();
+      if (depth === 0 && shot.camera && !layer.screenFixed && !focusIds.length) {
+        ctx.translate(shot.camera.pivotX, shot.camera.pivotY); ctx.scale(cameraScale, cameraScale);
+        ctx.translate(-shot.camera.pivotX, -shot.camera.pivotY);
+      }
+      ctx.globalAlpha *= clamp(l.alpha ?? 1); ctx.translate(x, y);
       const px = l.pivotX || 0, py = l.pivotY || 0;
       ctx.translate(px, py); ctx.rotate(l.angle || 0); ctx.scale(l.scaleX ?? 1, l.scaleY ?? 1); ctx.translate(-px, -py);
-      if (l.type === 'group') paintLayers(l.children, selected);
+      if (l.type === 'group') paintLayers(l.children, selected, depth + 1);
       else if (['path', 'rect', 'ellipse'].includes(l.type)) drawB3Shape(ctx, l);
       else if (l.type === 'puppet') drawPuppet(ctx, l, localTime);
       else if (l.type === 'image') {
@@ -124,7 +132,8 @@ export async function painter(p, {pictureOnly = false} = {}) {
     paintLayers(shot.layers);
     if (!focusIds.length && sceneCopy && p.television?.enabled !== false) {
       sceneCopy.getContext('2d').drawImage(canvas, 0, 0);
-      televisionFinish(ctx, sceneCopy, p.width, p.height, p.television?.intensity ?? 0.45);
+      televisionFinish(ctx, sceneCopy, p.width, p.height, p.television?.intensity ?? 0.45,
+        {...p.television, time: t, fps: p.fps});
     }
     const cue = p.captions.find(c => t >= c.start && t < c.end);
     if (cue && !pictureOnly && !focusIds.length) {

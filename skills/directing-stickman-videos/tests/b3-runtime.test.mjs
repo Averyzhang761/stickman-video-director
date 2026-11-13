@@ -64,6 +64,34 @@ test('B3 treatment changes the scene but leaves clean caption pixels unchanged',
   assert.ok(ink > 50, 'White caption ink is composited after television treatment');
 });
 
+test('B3 camera pushes artwork while screen-fixed UI holds its position', async t => {
+  const f = fixture(t);
+  f.project.shots[0].camera = {from: 1, to: 1.12, pivotX: 640, pivotY: 360};
+  f.project.shots[0].layers = [
+    {type: 'rect', x: 800, y: 200, w: 100, h: 100, fill: '#ffffff'},
+    {type: 'rect', x: 100, y: 100, w: 100, h: 100, fill: '#ff0000', screenFixed: true}
+  ];
+  save(f.file, f.project); const draw = await painter(loadProject(f.file));
+  const first = Buffer.from(draw(0).data()), last = Buffer.from(draw(0.8).data());
+  assert.notDeepEqual(first, last, 'Scene artwork should push in');
+  const patch = bytes => Buffer.concat(Array.from({length: 65}, (_, row) =>
+    bytes.subarray(((45 + row) * 640 + 45) * 4, ((45 + row) * 640 + 110) * 4)));
+  assert.deepEqual(patch(first), patch(last), 'Screen-fixed UI must not drift');
+  f.project.shots[0].camera.to = 2;
+  save(f.file, f.project); assert.throws(() => loadProject(f.file), /camera to/);
+});
+
+test('B3 signal grain is frame-varying and reproducible', async t => {
+  const f = fixture(t);
+  f.project.television = {enabled: true, intensity: 1, grain: 1, flicker: 1,
+    events: [{time: .333, kind: 'line'}]};
+  save(f.file, f.project); const draw = await painter(loadProject(f.file));
+  const first = Buffer.from(draw(.2).data());
+  assert.deepEqual(first, Buffer.from(draw(.2).data()));
+  assert.notDeepEqual(first, Buffer.from(draw(.3).data()));
+  assert.throws(() => validateB3(f.project.shots[0].layers, {events: [{time: .2, kind: 'unknown'}]}), /event/);
+});
+
 test('B3 validates bounded declarative artwork and rejects cross-style leakage', t => {
   const f = fixture(t); assert.equal(loadProject(f.file).style, 'B3');
   for (const layer of [

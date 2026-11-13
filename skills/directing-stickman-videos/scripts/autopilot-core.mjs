@@ -89,6 +89,11 @@ export function loadProject(file, {seconds} = {}) {
   if (p.style === 'B3') for (const type of ['group', 'path', 'rect', 'ellipse', 'puppet']) types.add(type);
   for (const [i, shot] of shots.entries()) {
     number(shot.start, 'shot start'); number(shot.end, 'shot end');
+    if (shot.camera !== undefined) {
+      if (p.style !== 'B3' || !shot.camera || Object.keys(shot.camera).sort().join(',') !== 'from,pivotX,pivotY,to') throw new Error('B3 camera needs from/to/pivotX/pivotY');
+      number(shot.camera.from, 'camera from', 0.9, 1.3); number(shot.camera.to, 'camera to', 0.9, 1.3);
+      number(shot.camera.pivotX, 'camera pivotX', 0, 1280); number(shot.camera.pivotY, 'camera pivotY', 0, 2276);
+    }
     if (Math.abs(shot.start - end) > 0.002 || shot.end <= shot.start) throw new Error(`Shot ${i}: gap/overlap or nonpositive duration`);
     end = shot.end;
     if (p.style === 'B4' && shot.end - shot.start > 3.000001 &&
@@ -98,7 +103,7 @@ export function loadProject(file, {seconds} = {}) {
     for (const l of walkLayers(shot.layers)) {
       if (!types.has(l.type)) throw new Error(`Unknown layer ${l.type}`);
       const b4Title = p.style === 'B4' && l.type === 'text' && ['setup', 'payoff'].includes(l.b4Hook);
-      if (p.style !== 'B3' && ['children', 'commands', 'radius', 'fill', 'stroke', ...(!b4Title ? ['pivotX', 'pivotY', 'scaleX', 'scaleY'] : [])].some(k => l[k] !== undefined)) throw new Error('B3 artwork properties cannot be used in another style');
+      if (p.style !== 'B3' && ['children', 'commands', 'radius', 'fill', 'stroke', 'screenFixed', ...(!b4Title ? ['pivotX', 'pivotY', 'scaleX', 'scaleY'] : [])].some(k => l[k] !== undefined)) throw new Error('B3 artwork properties cannot be used in another style');
       if (l.b4Hook !== undefined && !b4Title) throw new Error('Fixed B4 hook typography belongs to B4 text only');
       for (const k of ['x', 'y', 'w', 'h', 'size', 'angle', 'alpha', 'progress', 'lineWidth']) if (l[k] !== undefined) number(l[k], k, -10000, 10000);
       if (l.w !== undefined && l.w <= 0 || l.size !== undefined && l.size <= 0) throw new Error('Layer dimensions must be positive');

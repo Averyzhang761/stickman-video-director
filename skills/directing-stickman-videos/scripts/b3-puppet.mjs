@@ -29,7 +29,7 @@ export function puppetJoints(layer, t) {
 }
 
 export function drawPuppet(ctx, layer, t) {
-  const j = puppetJoints(layer, t), color = layer.color || '#eff1ee';
+  const j = puppetJoints(layer, t), color = layer.color || '#fafafa';
   const stroke = (points, width) => {
     ctx.beginPath(); ctx.moveTo(...j[points[0]]);
     for (const name of points.slice(1)) ctx.lineTo(...j[name]);

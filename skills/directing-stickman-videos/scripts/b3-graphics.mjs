@@ -39,6 +39,7 @@ export function validateB3(layers, television) {
     for (const l of list) {
       if (++count > 2000 || !l || typeof l !== 'object') throw new Error('Invalid B3 layer tree');
       for (const k of ['pivotX', 'pivotY', 'radius']) if (l[k] !== undefined) finite(l[k], k, k === 'radius' ? 0 : -10000);
+      if (l.screenFixed !== undefined && typeof l.screenFixed !== 'boolean') throw new Error('B3 screenFixed must be boolean');
       for (const k of ['scaleX', 'scaleY']) if (l[k] !== undefined) finite(l[k], k, 0.001, 100);
       for (const k of ['fill', 'stroke', 'color']) if (l[k] !== undefined && (typeof l[k] !== 'string' || !/^(?:#(?:[a-f\d]{3}|[a-f\d]{4}|[a-f\d]{6}|[a-f\d]{8})|rgba?\([\d\s.,%]+\)|[a-z]{1,20})$/i.test(l[k]))) throw new Error('Invalid B3 color');
       for (const k of ['alpha', 'progress']) if (l[k] !== undefined) finite(l[k], k, 0, 1);
@@ -54,9 +55,18 @@ export function validateB3(layers, television) {
   }
   visit(layers, 0);
   if (television !== undefined) {
-    if (!television || typeof television !== 'object' || Array.isArray(television) || Object.keys(television).some(k => !['enabled', 'intensity'].includes(k))) throw new Error('B3 television supports enabled/intensity only');
+    if (!television || typeof television !== 'object' || Array.isArray(television) || Object.keys(television).some(k => !['enabled', 'intensity', 'grain', 'flicker', 'events'].includes(k))) throw new Error('Invalid B3 television settings');
     if (television.enabled !== undefined && typeof television.enabled !== 'boolean') throw new Error('B3 television enabled must be boolean');
     if (television.intensity !== undefined) finite(television.intensity, 'television intensity', 0, 1);
+    if (television.grain !== undefined) finite(television.grain, 'television grain', 0, 1);
+    if (television.flicker !== undefined) finite(television.flicker, 'television flicker', 0, 1);
+    if (television.events !== undefined) {
+      if (!Array.isArray(television.events) || television.events.length > 100) throw new Error('Invalid B3 television events');
+      for (const event of television.events) {
+        if (!event || Object.keys(event).some(k => !['time', 'kind'].includes(k)) || !['line', 'rgb'].includes(event.kind)) throw new Error('Invalid B3 television event');
+        finite(event.time, 'television event time', 0, 86400);
+      }
+    }
   }
 }
 export function drawB3Shape(ctx, l) {
@@ -73,11 +83,10 @@ export function drawB3Shape(ctx, l) {
   if (l.fill !== 'none') { ctx.fillStyle = l.fill || '#dedfdf'; ctx.fill(); }
   if (l.stroke && l.stroke !== 'none') { ctx.strokeStyle = l.stroke; ctx.lineWidth = l.lineWidth ?? 3; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.stroke(); }
 }
-export function televisionFinish(ctx, source, width, height, intensity = 0.45) {
+export function televisionFinish(ctx, source, width, height, intensity = 0.45, options = {}) {
   if (!intensity) return;
   ctx.save(); ctx.resetTransform();
-  // A soft secondary image, subtle scanlines and vignette; no random full-screen
-  // glitches. Applied once to the scene, before clean captions are composited.
+  // Stable bloom and scanlines; time-varying signal noise stays below captions.
   ctx.globalCompositeOperation = 'screen'; ctx.globalAlpha = 0.14 * intensity;
   ctx.filter = `blur(${Math.max(0.4, width / 640)}px)`; ctx.drawImage(source, 0, 0);
   ctx.filter = 'none'; ctx.globalAlpha = 0.045 * intensity; ctx.drawImage(source, Math.max(1, width / 1280), 0);
@@ -86,5 +95,35 @@ export function televisionFinish(ctx, source, width, height, intensity = 0.45) {
   for (let y = 0; y < height; y += Math.max(3, Math.round(height / 240))) ctx.fillRect(0, y, width, 1);
   const vignette = ctx.createRadialGradient(width / 2, height / 2, width * 0.2, width / 2, height / 2, width * 0.7);
   vignette.addColorStop(0, 'rgba(0,0,0,0)'); vignette.addColorStop(1, `rgba(0,0,0,${0.3 * intensity})`);
-  ctx.fillStyle = vignette; ctx.fillRect(0, 0, width, height); ctx.restore();
+  ctx.fillStyle = vignette; ctx.fillRect(0, 0, width, height);
+  const frame = Math.round((options.time ?? 0) * (options.fps ?? 24));
+  let seed = (Math.imul(frame + 1, 1664525) + 1013904223) >>> 0;
+  const random = () => ((seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0) / 4294967296);
+  if (options.flicker) {
+    const pulse = (random() - .5) * .018 * options.flicker * intensity;
+    ctx.fillStyle = pulse >= 0 ? `rgba(255,255,255,${pulse})` : `rgba(0,0,0,${-pulse})`;
+    ctx.fillRect(0, 0, width, height);
+  }
+  if (options.grain) {
+    ctx.fillStyle = `rgba(255,255,255,${.22 * options.grain * intensity})`;
+    for (let i = 0, n = Math.round(width * height / 3000); i < n; i++) {
+      const x = Math.floor(random() * width), y = Math.floor(random() * height);
+      ctx.fillRect(x, y, random() < .85 ? 2 : 5, random() < .9 ? 2 : 1);
+    }
+  }
+  const event = options.events?.find(e => frame === Math.round(e.time * (options.fps ?? 24)));
+  if (event?.kind === 'line') {
+    ctx.fillStyle = `rgba(255,255,255,${.35 * intensity})`;
+    for (let i = 0; i < 14; i++) {
+      const y = Math.floor(random() * height), x = Math.floor(random() * width);
+      ctx.fillRect(x, y, 30 + random() * width * .32, random() < .7 ? 1 : 2);
+    }
+  }
+  if (event?.kind === 'rgb') {
+    ctx.globalCompositeOperation = 'screen'; ctx.globalAlpha = .34 * intensity;
+    ctx.filter = 'sepia(1) saturate(7) hue-rotate(-35deg)'; ctx.drawImage(source, -4, 0);
+    ctx.filter = 'sepia(1) saturate(7) hue-rotate(145deg)'; ctx.drawImage(source, 4, 0);
+    ctx.filter = 'none'; ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
+  }
+  ctx.restore();
 }
