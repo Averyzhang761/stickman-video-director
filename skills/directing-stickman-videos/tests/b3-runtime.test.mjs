@@ -8,6 +8,9 @@ import {ROOT, FFMPEG, run, save, loadProject, hashFile} from '../scripts/autopil
 import {painter, render} from '../scripts/autopilot-render.mjs';
 import {validateB3} from '../scripts/b3-graphics.mjs';
 import {makeChapterCard} from '../scripts/b3-chapter-card.mjs';
+import {makeOpeningSignal} from '../scripts/b3-opening-signal.mjs';
+import {makeUniversalOutro} from '../scripts/b3-universal-outro.mjs';
+import {makeSeriesBug, stampSeriesBug} from '../scripts/b3-series-bug.mjs';
 
 function fixture(t) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'stickman-b3-test-'));
@@ -104,7 +107,11 @@ test('B3 snow burst appears only on declared frames', async t => {
   assert.notDeepEqual(clean, Buffer.from(draw(.333).data()), 'Signal burst must be visible at its cue');
   assert.notDeepEqual(Buffer.from(draw(.333).data()), Buffer.from(draw(.417).data()), 'Burst frames should differ');
   assert.throws(() => validateB3(f.project.shots[0].layers,
-    {events: [{time: .2, kind: 'snow', frames: 7}]}), /frames/);
+    {events: [{time: .2, kind: 'snow', frames: 13}]}), /frames/);
+  assert.throws(() => validateB3(f.project.shots[0].layers,
+    {events: [{time: .2, kind: 'snow', frames: 8, strength: 2.1}]}), /strength/);
+  assert.doesNotThrow(() => validateB3(f.project.shots[0].layers,
+    {events: [{time: 0, kind: 'snow', frames: 8, strength: 1.7}]}));
 });
 
 test('B3 object glow lights only the nearby scene', async t => {
@@ -125,6 +132,43 @@ test('B3 chapter card supplies a bounded progress marker', () => {
   assert.equal(layers.filter(l => l.type === 'rect' && l.fill === '#fafafa').length, 2);
   assert.doesNotThrow(() => validateB3(layers));
   assert.throws(() => makeChapterCard({number: 9, total: 8, title: 'BAD'}), /number/);
+});
+
+test('B3 opening signal covers the reference-length heavy fault before the case card', () => {
+  const a = makeOpeningSignal({fps:24}), b = makeOpeningSignal({fps:30});
+  assert.equal(a.event.frames, 8); assert.equal(b.event.frames, 10);
+  assert.equal(a.cover.to, 8/24);
+  assert.equal(a.cover.screenFixed, true);
+  assert.doesNotThrow(() => validateB3([a.cover], {enabled:true,events:[a.event]}));
+  assert.throws(() => makeOpeningSignal({fps:60}), /12 frames/);
+});
+
+test('B3 universal outro has a full cat-woman presenter and story-independent last card', () => {
+  const outro = makeUniversalOutro({start:20,nextFile:9,channelName:'Night Index'});
+  assert.equal(outro.shots[0].start,20);
+  assert.equal(outro.shots[2].end,30);
+  assert.equal(outro.shots[2].kind,'end_card');
+  assert.equal(outro.shots[0].layers.find(l=>l.type==='puppet').appearance,'cat_archivist');
+  assert.match(outro.shots[0].layers.find(l=>l.type==='text').text,/NIGHT INDEX/);
+  assert.match(outro.shots[2].layers.find(l=>l.type==='text'&&l.text.startsWith('NEXT')).text,/009/);
+  assert.ok(outro.shots[1].layers.some(l=>l.type==='group'), 'Institutional paw seal appears before the last card');
+  assert.ok(outro.shots[2].layers.some(l=>l.type==='group'), 'Smaller paw print marks the upper right of the last card');
+  assert.ok(outro.shots[0].layers.some(l=>l.type==='text'&&l.text==='DEPARTMENT OF OPEN CASES'));
+  for (const shot of outro.shots) assert.doesNotThrow(()=>validateB3(shot.layers));
+  assert.throws(()=>makeUniversalOutro({nextFile:1}),/next file/);
+});
+
+test('B3 episode bug repeats the file identity on every story shot', () => {
+  const shots = stampSeriesBug([{start:0,end:2,layers:[{type:'text',text:'FILE 053  //  OLD NAME',x:70,y:110,screenFixed:true},
+    {type:'rect',x:0,y:0,w:10,h:10}]},
+    {start:2,end:4,layers:[{type:'rect',x:0,y:0,w:10,h:10}]}],
+    {fileNumber:53,channelName:'Night Index'});
+  assert.equal(shots.length,2);
+  assert.equal(shots[0].layers.at(-1).text,'FILE 053  //  NIGHT INDEX');
+  assert.equal(shots[1].layers.at(-1).text,shots[0].layers.at(-1).text);
+  assert.equal(shots[0].layers.at(-1).screenFixed,true);
+  assert.doesNotThrow(()=>validateB3([makeSeriesBug({fileNumber:53,channelName:'Night Index'})]));
+  assert.throws(()=>makeSeriesBug({fileNumber:0,channelName:'Night Index'}),/number/);
 });
 
 test('B3 validates bounded declarative artwork and rejects cross-style leakage', t => {

@@ -1,0 +1,20 @@
+# B3 anomalous-file visual findings
+
+These are frame observations from two Bradikinin videos. They explain the series direction, but their stories, spoken lines, character identities and music are not episode assets. Review the linked videos directly when possible; another upload or platform encode may shift individual frames.
+
+| Source | Frame-level observation | Reusable mechanism |
+|---|---|---|
+| [Dog / act normal](https://www.youtube.com/watch?v=Vpw2D6LsIV0), 0:00–0:10 | At 30 fps, frames 0–9 show full-screen, high-contrast static and broken white horizontal bands; frame 10 cuts to a clear room composition. The dog's pose changes inside the same scene during the opening seconds. | Put a roughly 0.33-second heavy signal seizure **before** the first case image. Then show a physical impossible action within a stable composition. Use `b3-opening-signal.mjs` for the timed event and cover. |
+| [Dog / act normal](https://www.youtube.com/watch?v=Vpw2D6LsIV0), 0:10–0:16 | A row of seven boxes fills and one is crossed out. Another strong fault lands near 0:15 as the meaning of the rules changes. | The progress row is story information; visible signal faults belong to contradictions, not a fixed timer. |
+| [Dog / act normal](https://www.youtube.com/watch?v=Vpw2D6LsIV0), 0:35, 2:35, 3:10, 3:45 | Large `RULE N` cards interrupt scenes at real rule turns; the cards use a short title and progress boxes. | Use brief mini-chapter cards that promise the next threat. Keep the system legible across the episode. |
+| [Dog / act normal](https://www.youtube.com/watch?v=Vpw2D6LsIV0), about 1:25–1:50 | Within a framed camera view, the dog approaches a refrigerator and its bright contents change; a small red REC dot marks the view as a recording. | White/gray solid objects with thick dark edges; local object displacement, physical light and functional red markers are separate layers. |
+| [Mom / door](https://www.youtube.com/watch?v=nL1nFHJzAG0), about 0:03 and 0:14 | Short broken horizontal lines and color offsets occur over otherwise legible pictures. Around 0:24 the bright door bottom casts a limited warm spill. | Maintain fine signal grain between events; reserve strong line/tear effects for specific beats. Light has a source and a nearby footprint. |
+| [Dog / act normal](https://www.youtube.com/watch?v=Vpw2D6LsIV0), about 4:05–4:33 | The trusted file voice/image becomes suspect; a final fault precedes a short imperative on near-black. The imperative holds while a small next-file label appears. | End an original case with a final reinterpretation, short status/command, enough visual hold and a next-file hook. Do not reuse the source's word or its character reveal. |
+
+## Production translation for this series
+
+- Physical people and props are **filled white and gray silhouettes with a thick near-black outer edge**. Thin lines are reserved for panels, labels, connectors and screen telemetry. A hollow head or an all-white door slab with no panels misses the reference's figure-ground grammar.
+- Native portrait shots need their own staging: keep the door, person and evidence in separate depth planes; add a handle, panels, floor contact and narrow motivated door-gap light. Recompose instead of stretching or centering a 16:9 door image.
+- Use continuous fine snow as a low-level recording texture; use visibly strong faults sparsely after the opening. The two inspected first-25-second windows contain about two or three obvious interruptions each, but story events determine later timing.
+- For this user's version, the protagonist is a woman casekeeper with agency and her own recorded narration. The recurring brand host is a female cat-headed archivist with a solid white/gray human body and black edges. She appears in the universal ending; the case protagonist may be a separate person. The reference characters' **solid construction** is the visual target, not their exact identity.
+- The second source's audio stream was acquired for study, but music and mix have not been verified by listening here. Do not claim to have reproduced its soundtrack or reuse it.

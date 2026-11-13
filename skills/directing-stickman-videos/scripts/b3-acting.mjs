@@ -75,6 +75,8 @@ export function makePuppet(spec) {
   const beat = [0,.2,.53,.79,.96].map(q => Math.round(duration * q * 1000) / 1000);
   const poses = [start,p1,p2,p3,p4].map((joints,i) => ({t:beat[i],joints}));
   return {type:'puppet',id,x,y,scaleX:scale,scaleY:scale,poses,
+    ...(spec.appearance ? {appearance:spec.appearance} : {}),
+    ...(spec.headStyle ? {headStyle:spec.headStyle} : {}),
     motion:{role:'actor',reason,action,objective:spec.objective || reason,target:spec.target || null}};
 }
 

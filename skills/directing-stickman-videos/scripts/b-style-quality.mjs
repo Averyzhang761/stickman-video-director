@@ -14,6 +14,13 @@ function* layerTree(layers, ancestors = []) {
 }
 export function prepareBStyleQuality(p, {root, hashFile, mediaPath}) {
   if (!(p.style in CAPTION_PRESETS)) return [];
+  const lastShot = p.shots.at(-1);
+  if (p.style === 'B3' && lastShot.kind === 'end_card' &&
+    (!text(lastShot.reason) || lastShot.end - lastShot.start > 8 ||
+      Math.abs(lastShot.end - p.rangeEnd) > .002 || !lastShot.layers.some(l => l.type === 'text')))
+    throw Error('B3 end_card needs a final text card, reason and hold of at most 8 seconds');
+  const motionEnd = p.style === 'B3' && lastShot.kind === 'end_card' ? lastShot.start : p.rangeEnd;
+  p.motion_check_end = motionEnd;
   const override = p.caption_override;
   const preset = p.style === 'B3' && p.series ? 50 : CAPTION_PRESETS[p.style];
   const changedFont = p.captionFont && hashFile(mediaPath(p.base, p.captionFont)) !== hashFile(path.join(root, 'assets/fonts/NotoSans.ttf'));
@@ -56,7 +63,7 @@ export function prepareBStyleQuality(p, {root, hashFile, mediaPath}) {
     if (item.start - end > 2.500001) throw Error(`${p.style} principal picture inactive for over 2.5s; cuts and caption changes do not count as motion`);
     end = Math.max(end, item.end);
   }
-  if (p.rangeEnd - end > 2.500001) throw Error(`${p.style} principal picture inactive for over 2.5s; add story-led local motion, not no-op keys or global zoom`);
+  if (motionEnd - end > 2.500001) throw Error(`${p.style} principal picture inactive for over 2.5s; add story-led local motion, not no-op keys or global zoom`);
   return intervals.filter((v, i, all) => all.findIndex(a => a.id === v.id && a.start === v.start && a.end === v.end) === i);
 }
 
@@ -66,10 +73,11 @@ export async function checkBStyleMotionPaint(p, draw) {
   // A 0.25s sampling margin makes the rolling windows conservative: a >2.5s
   // blank stretch contains an entire 2.25s check window. Do not credit a whole
   // minute merely because its endpoint differs by two design pixels.
-  const size = Math.min(p.rangeEnd, MAX_INACTIVE - SAMPLE_STEP), starts = new Set([0, Math.max(0,p.rangeEnd-size)]);
-  for (let start = SAMPLE_STEP; start + size < p.rangeEnd; start += SAMPLE_STEP) starts.add(start);
+  const motionEnd = p.motion_check_end ?? p.rangeEnd;
+  const size = Math.min(motionEnd, MAX_INACTIVE - SAMPLE_STEP), starts = new Set([0, Math.max(0,motionEnd-size)]);
+  for (let start = SAMPLE_STEP; start + size < motionEnd; start += SAMPLE_STEP) starts.add(start);
   for (const start of [...starts].sort((a,b)=>a-b)) {
-    const end = Math.min(p.rangeEnd,start+size); let best = null;
+    const end = Math.min(motionEnd,start+size); let best = null;
     for (const interval of intervals) {
       const a = Math.max(start,interval.start), b = Math.min(end,interval.end);
       if (b-a < .00001) continue;

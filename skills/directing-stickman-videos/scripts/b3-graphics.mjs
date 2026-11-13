@@ -40,6 +40,9 @@ export function validateB3(layers, television) {
       if (++count > 2000 || !l || typeof l !== 'object') throw new Error('Invalid B3 layer tree');
       for (const k of ['pivotX', 'pivotY', 'radius']) if (l[k] !== undefined) finite(l[k], k, k === 'radius' ? 0 : -10000);
       if (l.screenFixed !== undefined && typeof l.screenFixed !== 'boolean') throw new Error('B3 screenFixed must be boolean');
+      if (l.tracking !== undefined && (l.type !== 'text' || !Number.isFinite(l.tracking) || l.tracking < 0 || l.tracking > 12)) throw new Error('B3 text tracking must be 0–12');
+      if (l.fontRole !== undefined && (l.type !== 'text' || l.fontRole !== 'tag')) throw new Error('B3 fontRole must be tag text');
+      if (l.align !== undefined && (l.type !== 'text' || !['left','center'].includes(l.align))) throw new Error('B3 text align must be left or center');
       for (const k of ['scaleX', 'scaleY']) if (l[k] !== undefined) finite(l[k], k, 0.001, 100);
       for (const k of ['fill', 'stroke', 'color', 'glowColor']) if (l[k] !== undefined && (typeof l[k] !== 'string' || !/^(?:#(?:[a-f\d]{3}|[a-f\d]{4}|[a-f\d]{6}|[a-f\d]{8})|rgba?\([\d\s.,%]+\)|[a-z]{1,20})$/i.test(l[k]))) throw new Error('Invalid B3 color');
       if (l.glow !== undefined) finite(l.glow, 'glow', 0, 200);
@@ -64,9 +67,10 @@ export function validateB3(layers, television) {
     if (television.events !== undefined) {
       if (!Array.isArray(television.events) || television.events.length > 100) throw new Error('Invalid B3 television events');
       for (const event of television.events) {
-        if (!event || Object.keys(event).some(k => !['time', 'kind', 'frames'].includes(k)) || !['line', 'rgb', 'snow'].includes(event.kind)) throw new Error('Invalid B3 television event');
+        if (!event || Object.keys(event).some(k => !['time', 'kind', 'frames', 'strength'].includes(k)) || !['line', 'rgb', 'snow'].includes(event.kind)) throw new Error('Invalid B3 television event');
         finite(event.time, 'television event time', 0, 86400);
-        if (event.frames !== undefined && (!Number.isInteger(event.frames) || event.frames < 1 || event.frames > 6)) throw new Error('B3 television event frames must be 1–6');
+        if (event.frames !== undefined && (!Number.isInteger(event.frames) || event.frames < 1 || event.frames > 12)) throw new Error('B3 television event frames must be 1–12');
+        if (event.strength !== undefined) finite(event.strength, 'television event strength', 0.1, 2);
       }
     }
   }
@@ -136,20 +140,21 @@ export function televisionFinish(ctx, source, width, height, intensity = 0.45, o
     ctx.filter = 'none'; ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
   }
   if (event?.kind === 'snow') {
-    const strength = (1 - eventFrame / (event.frames ?? 1)) * intensity;
-    ctx.fillStyle = `rgba(255,255,255,${.65 * strength})`;
-    for (let i = 0, n = Math.round(width * height / 3200); i < n; i++)
+    const eventStrength = event.strength ?? 1;
+    const strength = (1 - eventFrame / (event.frames ?? 1)) * intensity * eventStrength;
+    ctx.fillStyle = `rgba(255,255,255,${Math.min(1, .65 * strength)})`;
+    for (let i = 0, n = Math.round(width * height / 3200 * eventStrength); i < n; i++)
       ctx.fillRect(random() * width, random() * height, 1 + random() * 4, 1 + random() * 3);
-    ctx.fillStyle = `rgba(0,0,0,${.5 * strength})`;
-    for (let i = 0, n = Math.round(width * height / 6400); i < n; i++)
+    ctx.fillStyle = `rgba(0,0,0,${Math.min(1, .5 * strength)})`;
+    for (let i = 0, n = Math.round(width * height / 6400 * eventStrength); i < n; i++)
       ctx.fillRect(random() * width, random() * height, 1 + random() * 4, 1 + random() * 3);
-    ctx.fillStyle = `rgba(255,255,255,${.7 * strength})`;
-    for (let i = 0; i < 28; i++)
+    ctx.fillStyle = `rgba(255,255,255,${Math.min(1, .7 * strength)})`;
+    for (let i = 0; i < Math.round(28 * eventStrength); i++)
       ctx.fillRect(random() * width, random() * height, 20 + random() * width * .45, random() < .8 ? 1 : 2);
     if (eventFrame === 0) {
       const tearY = Math.round(height * (.38 + random() * .25));
       ctx.drawImage(source, 0, tearY, width, 14, 10, tearY, width, 14);
-      ctx.globalCompositeOperation = 'screen'; ctx.globalAlpha = .48 * intensity;
+      ctx.globalCompositeOperation = 'screen'; ctx.globalAlpha = Math.min(1, .48 * intensity * eventStrength);
       ctx.filter = 'sepia(1) saturate(7) hue-rotate(-35deg)'; ctx.drawImage(source, -7, 0);
       ctx.filter = 'sepia(1) saturate(7) hue-rotate(145deg)'; ctx.drawImage(source, 7, 0);
       ctx.filter = 'none'; ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';

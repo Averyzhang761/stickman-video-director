@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {loadProject, mediaPath, probe} from './autopilot-core.mjs';
 import {walkLayers} from './b3-graphics.mjs';
+import {makeSeriesBug} from './b3-series-bug.mjs';
 
 function fail(message) { throw new Error(`B3 series: ${message}`); }
 const file = process.argv[2];
@@ -14,6 +15,13 @@ try {
   if (p.width * 16 !== p.height * 9) fail('picture must be native 9:16');
   if (!p.series || typeof p.series !== 'object') fail('series metadata required');
   if (typeof p.series.title !== 'string' || !p.series.title.trim()) fail('title required');
+  let bug;
+  try { bug = makeSeriesBug({fileNumber:p.series.file_number,channelName:p.series.channel_name}); }
+  catch { fail('series.channel_name and series.file_number are required'); }
+  for (const shot of p.shots.filter(s => !['universal_outro','end_card'].includes(s.kind))) {
+    if (!shot.layers.some(l => l.type === 'text' && l.screenFixed && l.text === bug.text))
+      fail(`story shot at ${shot.start}s lacks the current file/channel identifier`);
+  }
   if (!['placeholder', 'approved'].includes(p.series.voice_status)) fail('voice_status must be placeholder or approved');
   const score = [...p.score].sort((a, b) => a.start - b.start);
   const local = name => {
@@ -51,7 +59,7 @@ try {
       if (!joints || Math.min(distance('L'), distance('R')) > 30) fail(`puppet ${l.id} misses its declared contact point`);
     }
   }
-  const out = {valid: true, title: p.series.title, duration: p.duration, picture: `${p.width}x${p.height}`, cover: path.basename(cover), score_segments: score.length, actor_motion_shots: actorShots, contact_performances: contactActors.length, acting_ledger_entries: ledger.length, voice_status: p.series.voice_status, delivery_ready: false, human_review: 'acting, music, captions, cover and rights remain required'};
+  const out = {valid: true, title: p.series.title, channel_name:p.series.channel_name, file_number:p.series.file_number, duration: p.duration, picture: `${p.width}x${p.height}`, cover: path.basename(cover), score_segments: score.length, actor_motion_shots: actorShots, contact_performances: contactActors.length, acting_ledger_entries: ledger.length, voice_status: p.series.voice_status, delivery_ready: false, human_review: 'acting, music, captions, cover and rights remain required'};
   console.log(JSON.stringify(out, null, 2));
 } catch (error) {
   console.error(error.message);

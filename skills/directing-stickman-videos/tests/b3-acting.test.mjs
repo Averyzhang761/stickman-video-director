@@ -1,11 +1,30 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {createCanvas} from '@napi-rs/canvas';
 import {makePuppet, neutralPose} from '../scripts/b3-acting.mjs';
-import {validatePuppet, puppetJoints} from '../scripts/b3-puppet.mjs';
+import {validatePuppet, puppetJoints, drawPuppet} from '../scripts/b3-puppet.mjs';
+
+test('B3 people have solid heads unless an outline is explicitly requested', () => {
+  const p = makePuppet({id:'solid', action:'notice', reason:'see the receipt', objective:'read it', x:250, y:600, scale:1, duration:5});
+  p.color = '#fafafa';
+  const canvas = createCanvas(500, 700), ctx = canvas.getContext('2d');
+  ctx.translate(250, 600); drawPuppet(ctx, p, 0);
+  assert.deepEqual([...ctx.getImageData(250, 55, 1, 1).data], [250, 250, 250, 255]);
+  p.headStyle = 'outline';
+  ctx.clearRect(-250, -600, 500, 700); drawPuppet(ctx, p, 0);
+  assert.deepEqual([...ctx.getImageData(250, 55, 1, 1).data], [6, 9, 13, 255]);
+  p.headStyle = 'cat';
+  assert.throws(() => validatePuppet(p, 5), /head style/);
+  p.headStyle = 'solid'; p.appearance = 'cat_archivist';
+  assert.doesNotThrow(() => validatePuppet(p, 5));
+  p.appearance = 'catgirl';
+  assert.throws(() => validatePuppet(p, 5), /appearance/);
+});
 
 test('reach makes hand contact while both feet remain planted', () => {
-  const p = makePuppet({id:'reach', action:'reach', reason:'take the slip', objective:'retrieve proof', x:400, y:1700, scale:1, duration:5, target:[560,1500]});
+  const p = makePuppet({id:'reach', action:'reach', reason:'take the slip', objective:'retrieve proof', x:400, y:1700, scale:1, duration:5, target:[560,1500], appearance:'cat_archivist'});
   validatePuppet(p, 5);
+  assert.equal(p.appearance, 'cat_archivist');
   const contact = puppetJoints(p, p.poses[2].t);
   assert.ok(Math.hypot(contact.handR[0] - 160, contact.handR[1] + 200) < 1);
   assert.deepEqual(contact.footL, neutralPose().footL);

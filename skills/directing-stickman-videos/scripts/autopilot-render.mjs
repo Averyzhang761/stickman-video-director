@@ -31,6 +31,7 @@ export async function painter(p, {pictureOnly = false} = {}) {
   const fonts = fontPaths(p);
   const plane = designPlane(p), captionBand = plane.height - 110;
   if (!GlobalFonts.registerFromPath(fonts.hand, 'B1Hand') || !GlobalFonts.registerFromPath(fonts.caption, 'B1Caption')) throw new Error('Font registration failed');
+  if (fonts.tag && !GlobalFonts.registerFromPath(fonts.tag, 'B3Tag')) throw new Error('B3 metadata font registration failed');
   if (fonts.hook && !GlobalFonts.registerFromPath(fonts.hook, B4_HOOK.family)) throw new Error('B4 opening: fixed rounded font registration failed; no fallback is allowed');
   const canvas = createCanvas(p.width, p.height), ctx = canvas.getContext('2d');
   const sceneCopy = p.style === 'B3' ? createCanvas(p.width, p.height) : null;
@@ -107,7 +108,7 @@ export async function painter(p, {pictureOnly = false} = {}) {
         ctx.fillStyle = gradient; ctx.fillRect(0, 0, w, l.h);
       } else if (l.type === 'text') {
         const hook = p.style === 'B4' && ['setup', 'payoff'].includes(l.b4Hook);
-        const size = l.size || 52; ctx.font = `${hook ? B4_HOOK.weight : l.bold ? 700 : 400} ${size}px ${hook ? B4_HOOK.family : ['B3', 'B4'].includes(p.style) ? 'B1Caption' : 'B1Hand'}`; ctx.fillStyle = hook ? B4_HOOK[l.b4Hook] : l.color || (['B3', 'B4'].includes(p.style) ? '#e9eaea' : '#191916'); ctx.textBaseline = 'top';
+        const size = l.size || 52; ctx.font = `${hook ? B4_HOOK.weight : l.bold ? 700 : 400} ${size}px ${hook ? B4_HOOK.family : l.fontRole === 'tag' && fonts.tag ? 'B3Tag' : ['B3', 'B4'].includes(p.style) ? 'B1Caption' : 'B1Hand'}`; ctx.letterSpacing = `${l.tracking ?? 0}px`; ctx.fillStyle = hook ? B4_HOOK[l.b4Hook] : l.color || (['B3', 'B4'].includes(p.style) ? '#e9eaea' : '#191916'); ctx.textBaseline = 'top'; ctx.textAlign = l.align || 'left';
         const lines = wrap(ctx, l.text, l.w || 1080 - x);
         lines.forEach((s, i) => {
           const y = i * size * B4_HOOK.line_height;
@@ -118,7 +119,7 @@ export async function painter(p, {pictureOnly = false} = {}) {
             ctx.strokeStyle = B4_HOOK.outline; ctx.strokeText(s, 0, y);
             ctx.fillStyle = B4_HOOK[l.b4Hook];
           }
-          ctx.fillText(s, 0, y);
+          ctx.fillText(s, l.align === 'center' ? (l.w || 1080 - x) / 2 : 0, y);
         });
       } else {
         let points = l.points;
@@ -137,9 +138,10 @@ export async function painter(p, {pictureOnly = false} = {}) {
     }
     const cue = p.captions.find(c => t >= c.start && t < c.end);
     if (cue && !pictureOnly && !focusIds.length) {
-      ctx.font = `${p.style === 'B2' ? 500 : 600} ${p.captionSize || (p.style === 'B2' ? 40 : p.style === 'B3' && p.series ? 50 : 34)}px B1Caption`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      const roundedSeries = p.style === 'B3' && p.series;
+      ctx.font = `${p.style === 'B2' ? 500 : 600} ${p.captionSize || (p.style === 'B2' ? 40 : roundedSeries ? 50 : 34)}px B1Caption`; ctx.letterSpacing = roundedSeries ? '1.5px' : '0px'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
       if (/[\r\n]/.test(cue.text)) throw new Error('B captions allow at most one line; split the timed cue at a semantic boundary');
-      const lines = wrap(ctx, p.style === 'B3' ? cue.text.toUpperCase() : cue.text, 1120);
+      const lines = wrap(ctx, p.style === 'B3' ? cue.text.toUpperCase() : cue.text, roundedSeries ? 1076 : 1120);
       if (lines.length > 1) throw new Error('B captions allow at most one line; split the timed cue at a semantic boundary');
       const cy = plane.height - 60;
       if (p.style === 'B2') {
@@ -148,13 +150,15 @@ export async function painter(p, {pictureOnly = false} = {}) {
         lines.forEach((s, i) => { ctx.fillStyle = '#38382f'; ctx.fillText(s, 640, cy + i * 43); });
       } else lines.forEach((s, i) => {
         const y = cy + i * 43;
+        if (roundedSeries) { ctx.save(); ctx.translate(640,y); ctx.scale(1.04,.9); }
         ctx.strokeStyle = p.style === 'B4' ? '#303234' : p.style === 'B3' ? '#111316' : '#FDFDFC';
         ctx.lineWidth = ['B3', 'B4'].includes(p.style) ? 3 : 7;
         if (p.style === 'B4') { ctx.shadowColor = 'rgba(0,0,0,.45)'; ctx.shadowBlur = 2; ctx.shadowOffsetY = 2; }
-        ctx.strokeText(s, 640, y); ctx.fillStyle = p.style === 'B4' ? '#f8f5ed' : p.style === 'B3' ? '#f4f5f5' : '#20231F'; ctx.fillText(s, 640, y);
+        ctx.strokeText(s, roundedSeries ? 0 : 640, roundedSeries ? 0 : y); ctx.fillStyle = p.style === 'B4' ? '#f8f5ed' : p.style === 'B3' ? '#f4f5f5' : '#20231F'; ctx.fillText(s, roundedSeries ? 0 : 640, roundedSeries ? 0 : y);
         ctx.shadowBlur = 0; ctx.shadowOffsetY = 0;
+        if (roundedSeries) ctx.restore();
       });
-      ctx.textAlign = 'left';
+      ctx.textAlign = 'left'; ctx.letterSpacing = '0px';
     }
     return canvas;
   };

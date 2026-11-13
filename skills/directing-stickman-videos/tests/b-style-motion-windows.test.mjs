@@ -56,3 +56,20 @@ test('B3 title-only group motion cannot rescue a static principal picture',async
 test('B3 inherited group visibility limits motion coverage',()=>{
   assert.throws(()=>prepare(project('B3',{type:'group',from:3,children:[image()]})),/inactive/);
 });
+
+test('B3 allows only a reasoned final end-card hold after completed scene motion', async()=>{
+  const p=project('B3',image('prop',4),8);
+  p.shots[0].end=4;
+  p.shots.push({start:4,end:8,kind:'end_card',reason:'Hold the last case status after the reveal',layers:[
+    {type:'rect',w:1280,h:720,fill:'#020202'},
+    {type:'text',text:'CLAIMED.',x:200,y:100,size:80}
+  ]});
+  prepare(p);
+  assert.equal(p.motion_check_end,4);
+  const e=await checkBStyleMotionPaint(p,await painter(p));
+  assert.equal(e.windows.at(-1).end,4);
+  delete p.shots[1].reason;
+  assert.throws(()=>prepare(p),/end_card needs/);
+  p.shots[1].reason='Hold the last case status';p.shots[1].kind='ordinary';
+  assert.throws(()=>prepare(p),/inactive/);
+});
