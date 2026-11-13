@@ -46,7 +46,8 @@ try {
       boxes[activeChapter].fill!=='#fafafa'||boxes.some(l=>!l.screenFixed))
       fail(`story shot at ${shot.start}s lacks its current chapter progress boxes`);
   }
-  if (!['placeholder', 'approved'].includes(p.series.voice_status)) fail('voice_status must be placeholder or approved');
+  if (!['placeholder', 'review', 'approved'].includes(p.series.voice_status))
+    fail('voice_status must be placeholder, review or approved');
   const score = [...p.score].sort((a, b) => a.start - b.start);
   const local = name => {
     if (typeof name !== 'string' || path.isAbsolute(name)) fail('episode assets must use relative paths');

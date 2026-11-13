@@ -15,7 +15,7 @@ export function compactVoice(input, output, maxPause = .35) {
   const starts = [...scan.matchAll(/silence_start: ([\d.]+)/g)].map(match => Number(match[1]));
   const ends = [...scan.matchAll(/silence_end: ([\d.]+)/g)].map(match => Number(match[1]));
   if (starts.length !== ends.length) throw Error('incomplete silence scan');
-  const cuts = starts.flatMap((start, i) => ends[i] - start > .5 ?
+  const cuts = starts.flatMap((start, i) => ends[i] - start > Math.max(.5, maxPause) ?
     [[start + maxPause / 2, ends[i] - maxPause / 2]] : []);
   if (!cuts.length) fs.copyFileSync(input, output);
   else {
