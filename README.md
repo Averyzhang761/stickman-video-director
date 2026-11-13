@@ -17,6 +17,8 @@ Continually updated visual styles for **science explainers, dark psychology, tec
 
 </div>
 
+**Fork addition:** [INDEX NINE B3 suspense production workflow](docs/index-nine-b3-production.md) · [portable source and finished films](https://github.com/Averyzhang761/stickman-video-director/releases/tag/index-nine-b3-v1)
+
 <table width="100%">
 <tr>
 <td width="50%" align="center">

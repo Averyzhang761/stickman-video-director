@@ -1,0 +1,60 @@
+{
+  "series": "INDEX NINE",
+  "episodes": [
+    {
+      "file_number": 1,
+      "title": "The Receipt from Tomorrow",
+      "production_status": "final_voice",
+      "project": "work/b3_full_art_upgrade/project.json",
+      "video": "outputs/INDEX_NINE_未来收据_8分38秒_Helena干净配音_完整修正版.mp4",
+      "publication": {
+        "status": "published",
+        "platform": "TikTok",
+        "account": "@riolorien_lab",
+        "published_at": "2026-11-13T09:23:45Z",
+        "public_url": "https://www.tiktok.com/@riolorien_lab/video/7707584021638696223",
+        "buffer_post_id": "6af752c900fb1aa2bab512ed"
+      }
+    },
+    {
+      "file_number": 2,
+      "title": "The Seventh Window",
+      "production_status": "voice_review",
+      "project": "work/episode_002/project.json",
+      "video": "outputs/INDEX_NINE_FILE002_Kore配音_完整视频.mp4",
+      "publication": {
+        "status": "published",
+        "platform": "TikTok",
+        "account": "@riolorien_lab",
+        "published_at": "2026-11-13T18:45:10.224Z",
+        "public_url": "https://www.tiktok.com/@riolorien_lab/video/7707728545493110030",
+        "buffer_post_id": "6af75a502360c21f1264a944",
+        "public_page_verified": true,
+        "cover_status": "uploaded_via_tiktok_studio",
+        "cover_review": "studio_thumbnail_visible; platform review may be pending",
+        "cover_file": "outputs/INDEX_NINE_FILE002_3x4主页封面.png"
+      },
+      "voice": "Kore / Google Gemini 2.5 Flash TTS"
+    },
+    {
+      "file_number": 3,
+      "title": "The Crosswalk Counted Up",
+      "production_status": "voice_review",
+      "project": "work/episode_003/project.json",
+      "video": "outputs/INDEX_NINE_FILE003_Kore配音_完整视频.mp4",
+      "publication": {
+        "status": "published",
+        "platform": "TikTok",
+        "account": "@riolorien_lab",
+        "published_at": "2026-11-13T18:48:54.161Z",
+        "public_url": "https://www.tiktok.com/@riolorien_lab/video/7707729076814957837",
+        "buffer_post_id": "6af75ab76b1e97bcbcbbb37f",
+        "public_page_verified": true,
+        "cover_status": "uploaded_via_tiktok_studio",
+        "cover_review": "studio_thumbnail_visible; platform review may be pending",
+        "cover_file": "outputs/INDEX_NINE_FILE003_主页封面_3x4.png"
+      },
+      "voice": "Kore / Google Gemini 2.5 Flash TTS"
+    }
+  ]
+}
