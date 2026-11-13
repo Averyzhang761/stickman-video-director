@@ -67,7 +67,7 @@ try {
   if (!Array.isArray(plan.tracks) || !plan.tracks.length) fail('prop continuity ledger needs tracked story elements');
   const continuity = reconcileProps(p, plan);
   if (!continuity.valid) fail(`prop continuity failed: ${continuity.problems.join('; ')}`);
-  if (!p.score.length || new Set(p.score.map(s => s.source)).size < 2) fail('at least two distinct score segments required');
+  if (!p.score.length || new Set(p.score.map(s => s.path)).size < 2) fail('at least two distinct score segments required');
   if (score[0].start > .002 || score.at(-1).end < p.duration - .002) fail('score does not span the film');
   for (let i = 1; i < score.length; i++) if (score[i].start > score[i - 1].end + .002) fail('score has an uncovered gap');
   const actors = p.shots.flatMap(s => [...walkLayers(s.layers)].filter(l => l.motion?.role === 'actor'));
