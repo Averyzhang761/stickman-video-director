@@ -201,6 +201,16 @@ function makeSfx(p, file, duration) {
 function stamp(seconds, vtt = false) {
   const ms = Math.round(seconds * 1000); return `${String(Math.floor(ms / 3600000)).padStart(2, '0')}:${String(Math.floor(ms / 60000) % 60).padStart(2, '0')}:${String(Math.floor(ms / 1000) % 60).padStart(2, '0')}${vtt ? '.' : ','}${String(ms % 1000).padStart(3, '0')}`;
 }
+function pictureCacheShot(shot) {
+  const copy = structuredClone(shot);
+  for (const layer of walkLayers(copy.layers)) if (layer.motion) {
+    delete layer.motion.reason;
+    delete layer.motion.objective;
+  }
+  return copy;
+}
+// Reuse B3 picture clips made before narrative-only motion fields left the cache key.
+const LEGACY_B3_RENDERER_HASH = 'e7368c71222e6e4320967d0b617d68f7dd1bfcb69e936fbaaf0428a2fdb5be8c';
 export async function render(p, {full = false, draft = false, seconds = 20, replace = false} = {}) {
   // A preview never loads media or paints frames belonging only to the unfinished tail.
   if (!full) p = loadProject(p.file, {seconds});
@@ -232,9 +242,15 @@ export async function render(p, {full = false, draft = false, seconds = 20, repl
         if (layer.type === 'image') files.add(mediaPath(p.base, layer.path));
         if (layer.type === 'pose') files.add(mediaPath(p.base, '@b1/character-pose-sheet-v6.png'));
       }
-      const key = sha(JSON.stringify({shot, first, last, style: p.style, television: p.television, width: p.width, height: p.height, fps: p.fps, captions: p.captions.filter(c => c.end > first / p.fps && c.start < last / p.fps), captionSize: p.captionSize, grid: p.grid, inputs: p.inputs.filter(f => files.has(f.path)), rendererHash}));
-      const clip = path.join(cache, `${key}.mp4`); let valid = false;
+      const cacheSpec = {shot, first, last, style: p.style, television: p.television, width: p.width, height: p.height, fps: p.fps, captions: p.captions.filter(c => c.end > first / p.fps && c.start < last / p.fps), captionSize: p.captionSize, grid: p.grid, inputs: p.inputs.filter(f => files.has(f.path)), rendererHash};
+      const key = sha(JSON.stringify(p.style === 'B3' ? {...cacheSpec, shot: pictureCacheShot(shot)} : cacheSpec));
+      let clip = path.join(cache, `${key}.mp4`); let valid = false;
       if (fs.existsSync(clip)) try { const info = probe(clip); valid = Number(info.streams[0].nb_frames) === last - first; } catch {}
+      if (!valid && p.style === 'B3') {
+        const oldKey = sha(JSON.stringify({...cacheSpec, rendererHash: LEGACY_B3_RENDERER_HASH}));
+        const oldClip = path.join(cache, `${oldKey}.mp4`);
+        if (fs.existsSync(oldClip)) try { const info = probe(oldClip); valid = Number(info.streams[0].nb_frames) === last - first; if (valid) clip = oldClip; } catch {}
+      }
       if (valid) reused++; else { done(`rendering shot ${i + 1}/${p.shots.length}`); const tmp = path.join(cache, `${key}.partial.mp4`); await encode(p, frame, first, last - first, tmp); fs.renameSync(tmp, clip); }
       clips.push(clip); process.stdout.write(JSON.stringify({shot: i + 1, total: p.shots.length, cache_hit: valid}) + '\n');
     }

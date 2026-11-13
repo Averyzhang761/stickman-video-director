@@ -308,6 +308,17 @@ test('B3 nested media and finish changes invalidate cache; original audio remain
   assert.equal(finish.original_voice_sha256, voice); assert.equal(hashFile(path.join(f.dir, 'voice.wav')), voice);
 });
 
+test('B3 changing only a motion reason reuses the encoded picture', async t => {
+  const f = fixture(t), layer = f.project.shots[0].layers[0];
+  layer.id = 'moving_actor';
+  layer.motion = {role: 'actor', reason: 'The actor reaches toward the clue'};
+  save(f.file, f.project);
+  await render(loadProject(f.file));
+  layer.motion.reason = 'The actor reaches toward a future copy of the clue';
+  save(f.file, f.project);
+  assert.equal((await render(loadProject(f.file), {replace: true})).cache_hits, 1);
+});
+
 test('B3 CLI creates an explicit non-overwriting B3 scaffold', t => {
   const f = fixture(t), destination = path.join(f.dir, 'new-project');
   const cmd = () => spawnSync(process.execPath, [path.join(ROOT, 'scripts/autopilot.mjs'), 'init', destination, '--style', 'B3'], {encoding: 'utf8'});
