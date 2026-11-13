@@ -37,6 +37,22 @@ function template(project, track, name, stack = []) {
 export function reconcileProps(project, plan, repair = false) {
   const problems = [];
   let repaired = 0;
+  for (const rule of plan.absent_layers || []) {
+    const shot = project.shots[rule.shot];
+    if (!shot || !rule.match || !Object.keys(rule.match).length) throw Error('invalid absent layer rule');
+    const matches = shot.layers.filter(layer => Object.entries(rule.match).every(([key, value]) => layer[key] === value));
+    if (matches.length) {
+      problems.push(`shot ${rule.shot}: ${matches.length} unwanted ${JSON.stringify(rule.match)} layers`);
+      if (repair) { shot.layers = shot.layers.filter(layer => !matches.includes(layer)); repaired += matches.length; }
+    }
+  }
+  for (const rule of plan.layer_properties || []) {
+    const layer = layerAt(project, rule.shot, rule);
+    for (const [key, value] of Object.entries(rule.properties || {})) if (layer[key] !== value) {
+      problems.push(`shot ${rule.shot}: ${rule.id_pattern || rule.layer_id} ${key} differs`);
+      if (repair) { layer[key] = value; repaired++; }
+    }
+  }
   for (const track of plan.tracks || []) {
     if (!track.id || !track.states || !Array.isArray(track.instances)) throw Error('prop track needs id, states and instances');
     const expected = Object.fromEntries(Object.keys(track.states).map(name => [name, template(project, track, name)]));
@@ -53,19 +69,27 @@ export function reconcileProps(project, plan, repair = false) {
       prior = item;
     }
     for (const run of track.motion_runs || []) {
-      if (!Array.isArray(run.shots) || run.shots.length < 2 || !run.axis || !Number.isFinite(run.from) || !Number.isFinite(run.to)) throw Error(`${track.id}: invalid motion run`);
+      if (!Array.isArray(run.shots) || run.shots.length < 1 || !run.axis || !Number.isFinite(run.from) || !Number.isFinite(run.to)) throw Error(`${track.id}: invalid motion run`);
       run.shots.forEach((shotIndex, i) => {
         const layer = layerAt(project, shotIndex, track);
         const first = run.from + (run.to - run.from) * i / run.shots.length;
         const last = run.from + (run.to - run.from) * (i + 1) / run.shots.length;
         const keys = layer.keys;
         if (!keys || keys.length < 2) throw Error(`${track.id} shot ${shotIndex}: motion keys missing`);
+        const hold = run.hold_after;
+        if (hold !== undefined && (run.shots.length !== 1 || !Number.isFinite(hold) || hold <= 0 || hold >= keys.at(-1).t)) throw Error(`${track.id}: invalid hold_after`);
+        const hasHold = hold === undefined || keys.some(key => Math.abs(key.t - hold) < .01 && Math.abs((key[run.axis] ?? layer[run.axis]) - last) < .01);
         if (Math.abs((keys[0][run.axis] ?? layer[run.axis]) - first) > .01 ||
-            Math.abs((keys.at(-1)[run.axis] ?? layer[run.axis]) - last) > .01) {
+            Math.abs((keys.at(-1)[run.axis] ?? layer[run.axis]) - last) > .01 || !hasHold) {
           problems.push(`${track.id} shot ${shotIndex}: ${run.axis} resets across cut`);
           if (repair) {
             const duration = keys.at(-1).t - keys[0].t;
-            for (const key of keys) key[run.axis] = first + (last - first) * (duration ? (key.t - keys[0].t) / duration : 0);
+            if (hold !== undefined) {
+              const firstKey = copy(keys[0]), lastKey = copy(keys.at(-1));
+              firstKey[run.axis] = first;
+              lastKey[run.axis] = last;
+              layer.keys = [firstKey, {...copy(lastKey), t: hold}, lastKey];
+            } else for (const key of keys) key[run.axis] = first + (last - first) * (duration ? (key.t - keys[0].t) / duration : 0);
             if (run.axis in layer) layer[run.axis] = first;
             repaired++;
           }
