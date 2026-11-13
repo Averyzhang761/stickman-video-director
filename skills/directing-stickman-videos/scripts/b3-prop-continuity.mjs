@@ -118,6 +118,11 @@ export function reconcileProps(project, plan, repair = false) {
         problems.push(`${track.id} shot ${event.shot}: ${event.state} animation differs`);
         if (repair) { layer.alpha = want[0].alpha; layer.keys = want; repaired++; }
       }
+      const reason = event.reason || `Object is ${event.state}`;
+      if (layer.motion?.reason !== reason) {
+        problems.push(`${track.id} shot ${event.shot}: presence reason differs`);
+        if (repair) { layer.motion = {role:'prop',reason}; repaired++; }
+      }
       previousPresence = event;
     }
     for (const run of track.motion_runs || []) {
