@@ -32,7 +32,7 @@ export function finishSuspenseSeries(project, {channelName, fileNumber, chapters
     const push = evidenceText ? 1.025 : 1.08;
     return {...shot,camera:{from:1,to:push,pivotX:640,pivotY:1050},
       layers:[...layers,
-        ...(chapterByShot.has(index) ? makeChapterCard({...chapterByShot.get(index),showProgress:false}) : []),
+        ...(chapterByShot.has(index) ? makeChapterCard({...chapterByShot.get(index),fileNumber,showProgress:false}) : []),
         ...(index === 0 ? [opening.cover] : [])]};
   });
   return lockCharacterStyle({...project,shots:stampSeriesChrome(shots,{channelName,fileNumber,chapters}),

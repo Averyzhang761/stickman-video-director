@@ -35,6 +35,12 @@ try {
     if(activeChapter+1<chapters.length&&index===chapters[activeChapter+1].shot)activeChapter++;
     if (!shot.layers.some(l => l.type === 'text' && l.screenFixed && l.text === bug.text))
       fail(`story shot at ${shot.start}s lacks the current file/channel identifier`);
+    if (index === chapters[activeChapter].shot) {
+      const card = shot.layers.filter(l => l.seriesChrome === 'chapter_card_file');
+      const expected = String(p.series.file_number).padStart(3, '0');
+      if (card.length !== 1 || card[0].text !== expected)
+        fail(`chapter card at ${shot.start}s must show FILE ${expected}, not its chapter number`);
+    }
     const boxes=shot.layers.filter(l=>l.seriesChrome==='chapter_progress'&&l.type==='rect');
     if(boxes.length!==chapters.length||boxes.filter(l=>l.fill==='#fafafa').length!==1||
       boxes[activeChapter].fill!=='#fafafa'||boxes.some(l=>!l.screenFixed))

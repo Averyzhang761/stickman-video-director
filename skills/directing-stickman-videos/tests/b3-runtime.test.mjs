@@ -9,6 +9,8 @@ import {ROOT, FFMPEG, run, save, loadProject, hashFile} from '../scripts/autopil
 import {painter, render} from '../scripts/autopilot-render.mjs';
 import {validateB3} from '../scripts/b3-graphics.mjs';
 import {makeChapterCard} from '../scripts/b3-chapter-card.mjs';
+import {syncChapterCards} from '../scripts/b3-sync-chapter-cards.mjs';
+import {seriesSummary,registerEpisode} from '../scripts/b3-series-registry.mjs';
 import {makeChapterProgress,stampSeriesChrome} from '../scripts/b3-chapter-progress.mjs';
 import {makeOpeningSignal} from '../scripts/b3-opening-signal.mjs';
 import {makeUniversalOutro} from '../scripts/b3-universal-outro.mjs';
@@ -139,6 +141,27 @@ test('B3 chapter card supplies a bounded progress marker', () => {
   assert.equal(layers.filter(l => l.type === 'rect' && l.fill === '#fafafa').length, 2);
   assert.doesNotThrow(() => validateB3(layers));
   assert.throws(() => makeChapterCard({number: 9, total: 8, title: 'BAD'}), /number/);
+  const seriesCard = makeChapterCard({number: 2, total: 8, title: 'THE LOSSES', fileNumber: 53});
+  assert.equal(seriesCard.find(l => l.seriesChrome === 'chapter_card_file').text, '053');
+  assert.equal(seriesCard.find(l => l.type === 'text' && l.text === 'FILE').text, 'FILE');
+});
+
+test('B3 chapter sync replaces chapter-as-file numbers and is idempotent', () => {
+  const project = {series:{file_number:3,chapters:[{shot:0,title:'THE COUNT'}]},
+    shots:[{layers:makeChapterCard({number:1,total:1,title:'THE COUNT',showProgress:false})}]};
+  assert.equal(syncChapterCards(project).changed,1);
+  assert.equal(project.shots[0].layers.find(l=>l.seriesChrome==='chapter_card_file').text,'003');
+  assert.equal(syncChapterCards(project).changed,0);
+});
+
+test('B3 series registry separates produced from published and advances file number', () => {
+  const registry = {series:'INDEX NINE',episodes:[
+    {file_number:1,title:'A',publication:{status:'not_published'}},
+    {file_number:2,title:'B',publication:{status:'published',url:'https://example.com/b'}}]};
+  assert.deepEqual(seriesSummary(registry),{series:'INDEX NINE',produced_count:2,published_count:1,next_file_number:3});
+  assert.deepEqual(registerEpisode(registry,{file_number:3,title:'C'}),
+    {series:'INDEX NINE',produced_count:3,published_count:1,next_file_number:4});
+  assert.throws(() => registerEpisode(registry,{file_number:3,title:'duplicate'}));
 });
 
 test('B3 pictogram actor has a filled torso and two visible feet', () => {
