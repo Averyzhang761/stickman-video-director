@@ -56,6 +56,10 @@ try {
   const cover = local(p.series.cover);
   const coverStream = probe(cover).streams.find(s => s.codec_type === 'video');
   if (coverStream?.width !== 1080 || coverStream?.height !== 1920) fail('cover must be 1080×1920');
+  if (p.series.profile_cover) {
+    const profileStream = probe(local(p.series.profile_cover)).streams.find(s => s.codec_type === 'video');
+    if (profileStream?.width !== 1080 || profileStream?.height !== 1440) fail('profile cover must be 1080×1440');
+  }
   const ledger = JSON.parse(fs.readFileSync(local(p.series.acting_ledger), 'utf8'));
   if (!Array.isArray(ledger)) fail('acting_ledger must be an array');
   if (!p.series.prop_continuity) fail('series.prop_continuity ledger required before rendering');
@@ -82,7 +86,7 @@ try {
       if (!joints || Math.min(distance('L'), distance('R')) > 30) fail(`puppet ${l.id} misses its declared contact point`);
     }
   }
-  const out = {valid: true, title: p.series.title, channel_name:p.series.channel_name, file_number:p.series.file_number, chapter_count:chapters.length, chapter_guidance:chapters.length>=7&&chapters.length<=9?'within preferred 7–9 for 8–9 minutes':'review the story beats; 7–9 is preferred, not required', duration: p.duration, picture: `${p.width}x${p.height}`, cover: path.basename(cover), score_segments: score.length, actor_motion_shots: actorShots, contact_performances: contactActors.length, acting_ledger_entries: ledger.length, voice_status: p.series.voice_status, delivery_ready: false, human_review: 'acting, music, captions, cover and rights remain required'};
+  const out = {valid: true, title: p.series.title, channel_name:p.series.channel_name, file_number:p.series.file_number, chapter_count:chapters.length, chapter_guidance:chapters.length>=7&&chapters.length<=9?'within preferred 7–9 for 8–9 minutes':'review the story beats; 7–9 is preferred, not required', duration: p.duration, picture: `${p.width}x${p.height}`, cover: path.basename(cover), ...(p.series.profile_cover ? {profile_cover:p.series.profile_cover} : {}), score_segments: score.length, actor_motion_shots: actorShots, contact_performances: contactActors.length, acting_ledger_entries: ledger.length, voice_status: p.series.voice_status, delivery_ready: false, human_review: 'acting, music, captions, cover and rights remain required'};
   console.log(JSON.stringify(out, null, 2));
 } catch (error) {
   console.error(error.message);
