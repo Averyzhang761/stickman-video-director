@@ -4,6 +4,7 @@ import crypto from 'node:crypto';
 import {fileURLToPath} from 'node:url';
 import {spawnSync} from 'node:child_process';
 import {walkLayers, validateB3, visibleLayers} from './b3-graphics.mjs';
+import {validatePuppet} from './b3-puppet.mjs';
 import {prepareB4, prepareAudioTracks} from './b4-runtime.mjs';
 import {prepareBStyleQuality} from './b-style-quality.mjs';
 import {B4_HOOK, planB4Opening} from './b4-opening.mjs';
@@ -85,7 +86,7 @@ export function loadProject(file, {seconds} = {}) {
   const assets = new Set([voicePath]);
   const types = new Set(['image', 'pose', 'text', 'line', 'arrow', 'underline']);
   if (p.style === 'B4') types.add('shadow');
-  if (p.style === 'B3') for (const type of ['group', 'path', 'rect', 'ellipse']) types.add(type);
+  if (p.style === 'B3') for (const type of ['group', 'path', 'rect', 'ellipse', 'puppet']) types.add(type);
   for (const [i, shot] of shots.entries()) {
     number(shot.start, 'shot start'); number(shot.end, 'shot end');
     if (Math.abs(shot.start - end) > 0.002 || shot.end <= shot.start) throw new Error(`Shot ${i}: gap/overlap or nonpositive duration`);
@@ -107,6 +108,7 @@ export function loadProject(file, {seconds} = {}) {
       if (l.type === 'text' && (typeof l.text !== 'string' || !l.text.trim() || l.text.length > 400)) throw new Error('Text layer must be 1–400 characters');
       if (l.type === 'line' && (!Array.isArray(l.points) || l.points.length < 2 || l.points.some(pt => !Array.isArray(pt) || pt.length !== 2 || pt.some(n => !Number.isFinite(n))))) throw new Error('Line requires finite [x,y] points');
       const span = shot.end - shot.start;
+      if (l.type === 'puppet') validatePuppet(l, span);
       number(l.from ?? 0, 'layer from', 0, span); number(l.to ?? span, 'layer to', l.from ?? 0, span);
       let previous = -1;
       for (const key of l.keys || []) {
@@ -144,7 +146,7 @@ export function loadProject(file, {seconds} = {}) {
   for (const f of Object.values(fontPaths(project))) { if (!fs.existsSync(f)) throw new Error(`Missing font: ${f}`); assets.add(f); }
   if (p.style === 'B4' && hashFile(fontPaths(project).hook) !== B4_HOOK.font_sha256) throw new Error('B4 opening: bundled rounded font changed; restore the fixed font instead of silently substituting it');
   const inputs = [...assets].sort().map(f => ({path: f, sha256: hashFile(f)}));
-  const engine = ['autopilot-core.mjs', 'autopilot-render.mjs', 'b3-graphics.mjs', 'b-style-quality.mjs', 'b-style-motion-geometry.mjs', 'b4-runtime.mjs', ...(p.style === 'B4' ? ['b4-style-lock.mjs', 'b4-opening-audio-check.mjs', 'b4-opening.mjs', 'b4-opening-visual-check.mjs'] : [])].map(f => hashFile(path.join(ROOT, 'scripts', f)));
+  const engine = ['autopilot-core.mjs', 'autopilot-render.mjs', 'b3-graphics.mjs', 'b3-puppet.mjs', 'b-style-quality.mjs', 'b-style-motion-geometry.mjs', 'b4-runtime.mjs', ...(p.style === 'B4' ? ['b4-style-lock.mjs', 'b4-opening-audio-check.mjs', 'b4-opening.mjs', 'b4-opening-visual-check.mjs'] : [])].map(f => hashFile(path.join(ROOT, 'scripts', f)));
   return {...project, inputs, fingerprint: sha(JSON.stringify({project: timeline, rangeEnd, inputs, engine}))};
 }
 export function outputDir(p) {

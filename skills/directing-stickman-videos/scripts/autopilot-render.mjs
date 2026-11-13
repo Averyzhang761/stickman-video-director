@@ -5,6 +5,7 @@ import {once} from 'node:events';
 import {createCanvas, loadImage, GlobalFonts} from '@napi-rs/canvas';
 import {ROOT, FFMPEG, sha, hashFile, save, probe, run, mediaPath, fontPaths, outputDir, designPlane, loadProject} from './autopilot-core.mjs';
 import {walkLayers, drawB3Shape, televisionFinish, keyState} from './b3-graphics.mjs';
+import {drawPuppet} from './b3-puppet.mjs';
 export {keyState} from './b3-graphics.mjs';
 import {appendAudioTracks} from './b4-runtime.mjs';
 import {checkBStyleMotionPaint} from './b-style-quality.mjs';
@@ -82,6 +83,7 @@ export async function painter(p, {pictureOnly = false} = {}) {
       ctx.translate(px, py); ctx.rotate(l.angle || 0); ctx.scale(l.scaleX ?? 1, l.scaleY ?? 1); ctx.translate(-px, -py);
       if (l.type === 'group') paintLayers(l.children, selected);
       else if (['path', 'rect', 'ellipse'].includes(l.type)) drawB3Shape(ctx, l);
+      else if (l.type === 'puppet') drawPuppet(ctx, l, localTime);
       else if (l.type === 'image') {
         const img = images.get(mediaPath(p.base, l.path)), h = l.h || w * img.height / img.width;
         const scale = Math.min(w / img.width, h / img.height);
@@ -209,7 +211,7 @@ export async function render(p, {full = false, draft = false, seconds = 20, repl
     const motionEvidence = await checkBStyleMotionPaint(p, frame);
     const picture = p.style === 'B4' ? await painter(p, {pictureOnly: true}) : null;
     if (p.style === 'B4') await checkB4OpeningPaint(p, {draw: frame, picture});
-    const rendererHash = sha(['autopilot-render.mjs', 'b3-graphics.mjs'].map(f => hashFile(path.join(ROOT, 'scripts', f))).join(':'));
+    const rendererHash = sha(['autopilot-render.mjs', 'b3-graphics.mjs', 'b3-puppet.mjs'].map(f => hashFile(path.join(ROOT, 'scripts', f))).join(':'));
     for (const [i, shot] of p.shots.entries()) {
       const first = Math.round(shot.start * p.fps), last = Math.min(count, i === p.shots.length - 1 ? count : Math.round(shot.end * p.fps)); if (last <= first) continue;
       const files = new Set(Object.values(fontPaths(p)));

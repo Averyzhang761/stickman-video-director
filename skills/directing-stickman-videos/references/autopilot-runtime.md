@@ -46,6 +46,8 @@ Layers: `image` (local PNG/JPEG, contain-fit within optional `h`), `pose` (B1 on
 
 ## B3 layered artwork
 
+B3 also accepts a `puppet` layer for cutout acting. It has local `x`, `y`, `scaleX`, `scaleY`, a unique `id`, `motion: {role: "actor", reason, action, objective, target}` and 2–12 complete `poses: [{t, joints}]`. Each pose has the same 14 named `[x,y]` joints (`head`, `neck`, left/right shoulders, elbows, hands, hips, knees and feet). Times increase within the shot and start at zero. The renderer interpolates joint coordinates while keeping arms and legs attached. Optional local `occludeBelow` hides the body/legs beneath a counter while leaving hands in front; place it at the actual counter edge. Use `scripts/b3-acting.mjs` to expand a story action and contact point into these poses; it does not infer the action from narration or move a prop automatically. Inspect encoded before/contact/after states and phone-size staging.
+
 `init DIR --style B3` creates a non-overwriting B3 scaffold. B3 additionally accepts these declarative layers; no JavaScript, SVG markup, URLs or executable expressions:
 
 - `path`: `commands` are numeric arrays beginning with `M`; supported commands are `M x y`, `L x y`, `Q cx cy x y`, `C c1x c1y c2x c2y x y`, and `Z`. Choose `fill`/`stroke` colors or `none`, and a positive `lineWidth`. Use curves for rounded limbs/pets rather than dense angular connector scaffolds. Paths do not interpolate or draw themselves; use separate pose layers with `from`/`to`, and `line.progress` for progressive connectors.

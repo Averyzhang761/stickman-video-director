@@ -36,6 +36,11 @@ export function prepareBStyleQuality(p, {root, hashFile, mediaPath}) {
     for (let t = 0; t < span; t += SAMPLE_STEP) times.add(t);
     if (isSceneScaleMotion(layer, ancestors, [...times].filter(t => t >= 0 && t <= span), {width:1280,height:1280*p.height/p.width}))
       throw Error('A full-frame image or scene-scale group transform does not count as local micro-animation; declare a smaller actor/prop instead');
+    if (layer.type === 'puppet') for (let i = 1; i < layer.poses.length; i++) {
+      const a = layer.poses[i - 1], b = layer.poses[i];
+      const changed = Object.keys(a.joints).some(name => Math.hypot(b.joints[name][0] - a.joints[name][0], b.joints[name][1] - a.joints[name][1]) >= 8);
+      if (changed) intervals.push({id: layer.id, start: shot.start + a.t, end: Math.min(shot.start + b.t, p.rangeEnd), reason: layer.motion.reason});
+    }
     for (const [prop, delta] of [['x', 2], ['y', 2], ['angle', .02], ['progress', .02], ['scaleX', .02], ['scaleY', .02], ['w', 2]]) {
       const keys = (layer.keys || []).filter(k => k[prop] !== undefined);
       for (let i = 1; i < keys.length; i++) {
