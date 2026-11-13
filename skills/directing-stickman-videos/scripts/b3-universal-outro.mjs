@@ -45,6 +45,11 @@ export function makeUniversalOutro({start = 0, nextFile = 2, channelName, identi
         black,
         {type:'image',path:identityImage,x:0,y:0,w:1280,h:2276,id:'identity_frame',
           ...(headSideImage ? {to:2.2} : {})},
+        // The approved raster contains a sample file number. Cover it and stamp
+        // the current episode number so the reusable identity stays accurate.
+        {type:'rect',x:76,y:30,w:640,h:103,fill:'#020202',to:headSideImage ? 2.2 : 4.5},
+        {type:'text',text:`FILE ${String(nextFile - 1).padStart(3,'0')}  //  ${channelName.trim().toUpperCase()}`,
+          x:100,y:96,size:31,color:'#bcbcbc',tracking:5,fontRole:'tag',to:headSideImage ? 2.2 : 4.5},
         ...(headSideImage ? [
           {type:'image',path:headSideImage,x:200,y:380,w:880,h:845,id:'identity_head_side',from:2.2,to:2.52,
             motion:{role:'actor',reason:'The archivist begins turning toward the viewer'},

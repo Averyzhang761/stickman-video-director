@@ -230,6 +230,8 @@ test('B3 branded outro isolates the human-hand identity frame from the three hea
   assert.equal(layers.find(l=>l.id==='identity_head_side').from,2.2);
   assert.equal(layers.find(l=>l.id==='identity_head_mid').from,2.52);
   assert.equal(layers.find(l=>l.id==='identity_head_front').from,2.84);
+  assert.ok(layers.some(l=>l.type==='text'&&l.text==='FILE 001  //  INDEX NINE'&&l.to===2.2),
+    'A reusable raster identity must show the current case number');
   assert.ok(!layers.some(l=>l.type==='rect' && l.from===2.2), 'No head-cover rectangle can cut the neck');
   assert.equal(p.shots[2].kind,'end_card');
   assert.equal(p.series.channel_name,'Index Nine');
