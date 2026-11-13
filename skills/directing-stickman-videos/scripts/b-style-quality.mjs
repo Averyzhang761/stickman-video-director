@@ -15,12 +15,13 @@ function* layerTree(layers, ancestors = []) {
 export function prepareBStyleQuality(p, {root, hashFile, mediaPath}) {
   if (!(p.style in CAPTION_PRESETS)) return [];
   const override = p.caption_override;
+  const preset = p.style === 'B3' && p.series ? 50 : CAPTION_PRESETS[p.style];
   const changedFont = p.captionFont && hashFile(mediaPath(p.base, p.captionFont)) !== hashFile(path.join(root, 'assets/fonts/NotoSans.ttf'));
-  const changedSize = p.captionSize !== undefined && p.captionSize !== CAPTION_PRESETS[p.style];
+  const changedSize = p.captionSize !== undefined && p.captionSize !== preset;
   if ((changedFont || changedSize) && !(text(override?.reason) && text(override?.user_approval))) {
     // A scoped script/language fallback may replace glyph coverage, not restyle the video.
     if (!(changedFont && !changedSize && override?.kind === 'language_fallback' && text(override.language) && text(override.reason)))
-      throw Error(`${p.style} caption preset invalidated: use the bundled Noto Sans/${CAPTION_PRESETS[p.style]} treatment or record caption_override reason and actual user_approval`);
+      throw Error(`${p.style} caption preset invalidated: use the bundled Noto Sans/${preset} treatment or record caption_override reason and actual user_approval`);
   }
   const intervals = [], ids = new Set();
   for (const shot of p.shots) for (const {layer, ancestors} of layerTree(shot.layers)) {

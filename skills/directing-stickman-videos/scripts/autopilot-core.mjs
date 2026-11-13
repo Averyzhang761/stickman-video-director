@@ -57,6 +57,8 @@ export function loadProject(file, {seconds} = {}) {
   const p = json(file), base = path.dirname(file);
   if (p.version !== 1 || !STYLES.includes(p.style)) throw new Error('Expected version 1 and style B1, B2, B3 or B4');
   if (p.style !== 'B3' && p.television !== undefined) throw new Error('Television finish belongs to B3 only');
+  if (p.style !== 'B3' && p.score !== undefined) throw new Error('Segmented score belongs to B3 only');
+  if (p.style === 'B3' && p.score && p.music) throw new Error('Use B3 score segments or one looped music track, not both');
   if (p.style !== 'B4' && p.opening_audio_override !== undefined) throw new Error('B4 opening audio override belongs to B4 only');
   number(p.width, 'width', 256, 3840); number(p.height, 'height', 256, 3840); number(p.fps, 'fps', 12, 60);
   if (![p.width, p.height, p.fps].every(Number.isInteger) || p.width % 2 || p.height % 2) throw new Error('Even integer dimensions and integer fps required');
@@ -72,7 +74,7 @@ export function loadProject(file, {seconds} = {}) {
   const voiceTrimStart = p.voice.trim_start ?? 0;
   number(voiceTrimStart, 'voice trim_start', 0, Math.min(5, voiceDuration - 0.01));
   const duration = voiceDuration - voiceTrimStart + lead + tail;
-  if (seconds !== undefined) number(seconds, 'preview length', 0.001, 60);
+  if (seconds !== undefined) number(seconds, 'preview length', 0.001, p.style === 'B3' ? 180 : 60);
   const rangeEnd = Math.min(duration, seconds ?? duration);
   const scoped = seconds !== undefined;
   if (p.captionSize !== undefined) number(p.captionSize, 'caption size', 20, 64);

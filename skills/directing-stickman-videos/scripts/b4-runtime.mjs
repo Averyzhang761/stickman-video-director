@@ -24,7 +24,7 @@ export function prepareB4(p, context) {
 // Provider-independent local tracks shared by B1–B4. B4 identity/visual gates stay above.
 export function prepareAudioTracks(p, {base, duration, rangeEnd, assets, mediaPath, probe}) {
   if (p.voice.contains_sfx !== undefined && typeof p.voice.contains_sfx !== 'boolean') throw new Error(`${p.style} contains_sfx must be boolean`);
-  for (const key of ['ambience', 'dialogue', 'audio_cuts']) if (p[key] !== undefined && !Array.isArray(p[key])) throw new Error(`${p.style} ${key} must be an array`);
+  for (const key of ['ambience', 'dialogue', 'audio_cuts', 'score']) if (p[key] !== undefined && !Array.isArray(p[key])) throw new Error(`${p.style} ${key} must be an array`);
   const active = (list, time) => (list || []).filter(item => !item || !Number.isFinite(item[time]) || item[time] < rangeEnd);
   const clip = (item, bed = false) => {
     fields(item, bed ? ['path', 'start', 'end', 'gain', 'offset', 'loop', 'fadeIn', 'fadeOut'] :
@@ -45,6 +45,7 @@ export function prepareAudioTracks(p, {base, duration, rangeEnd, assets, mediaPa
       source, offset, length: Math.min(length, rangeEnd - start), envelopeLength: length, start};
   };
   const ambience = active(p.ambience, 'start').map(item => clip(item, true));
+  const score = active(p.score, 'start').map(item => clip(item, true));
   const dialogue = active(p.dialogue, 'time').map(item => clip(item));
   const sfx = active(p.sfx, 'time').map(item => item?.kind === 'file' ? clip(item) : item);
   const audio_cuts = active(p.audio_cuts, 'start').map(item => {
@@ -53,7 +54,7 @@ export function prepareAudioTracks(p, {base, duration, rangeEnd, assets, mediaPa
     if (!text(item.reason) || !text(item.return_trigger)) throw new Error('Audio cut requires reason and return_trigger');
     return {...item, end: Math.min(item.end, rangeEnd)};
   });
-  if (p.voice.contains_sfx && (sfx.length || ambience.length || dialogue.length || p.music || audio_cuts.length)) throw new Error('Already mixed master must not receive duplicate audio tracks/cuts');
+  if (p.voice.contains_sfx && (sfx.length || ambience.length || score.length || dialogue.length || p.music || audio_cuts.length)) throw new Error('Already mixed master must not receive duplicate audio tracks/cuts');
   if (!p.voice.contains_sfx) {
     // Keep muted tracks editable, but do not count silence as a continuous bed.
     // Nonzero gain establishes structural coverage only: the source and encoded
@@ -66,14 +67,14 @@ export function prepareAudioTracks(p, {base, duration, rangeEnd, assets, mediaPa
     }
     if (end < rangeEnd - 0.002) throw new Error(`${p.style} requires a subtle continuous ambience bed with nonzero gain, a motivated audio_cut or an already mixed master`);
   }
-  return {ambience, dialogue, sfx, audio_cuts};
+  return {ambience, score, dialogue, sfx, audio_cuts};
 }
 
 // Each input remains independent for repairs; no time-stretch or automatic ducking.
 export function appendB4Audio(p, args, filters, mixes, backgrounds, index) {
-  for (const [kind, clips] of [['bed', p.ambience], ['dialogue', p.dialogue], ['effect', p.sfx?.filter(s => s.kind === 'file')]]) {
+  for (const [kind, clips] of [['bed', p.ambience], ['score', p.score], ['dialogue', p.dialogue], ['effect', p.sfx?.filter(s => s.kind === 'file')]]) {
     for (const clip of clips || []) {
-      if (kind === 'bed' && clip.loop !== false) args.push('-stream_loop', '-1');
+      if (['bed', 'score'].includes(kind) && clip.loop !== false) args.push('-stream_loop', '-1');
       args.push('-i', clip.source);
       const name = `b4track${index}`;
       const chain = [`atrim=start=${clip.offset}:duration=${clip.length}`, 'asetpts=PTS-STARTPTS', `volume=${clip.gain}`];

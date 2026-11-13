@@ -126,7 +126,7 @@ export async function painter(p, {pictureOnly = false} = {}) {
     }
     const cue = p.captions.find(c => t >= c.start && t < c.end);
     if (cue && !pictureOnly && !focusIds.length) {
-      ctx.font = `${p.style === 'B2' ? 500 : 600} ${p.captionSize || (p.style === 'B2' ? 40 : 34)}px B1Caption`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.font = `${p.style === 'B2' ? 500 : 600} ${p.captionSize || (p.style === 'B2' ? 40 : p.style === 'B3' && p.series ? 50 : 34)}px B1Caption`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
       if (/[\r\n]/.test(cue.text)) throw new Error('B captions allow at most one line; split the timed cue at a semantic boundary');
       const lines = wrap(ctx, p.style === 'B3' ? cue.text.toUpperCase() : cue.text, 1120);
       if (lines.length > 1) throw new Error('B captions allow at most one line; split the timed cue at a semantic boundary');
@@ -186,7 +186,7 @@ function makeSfx(p, file, duration) {
 function stamp(seconds, vtt = false) {
   const ms = Math.round(seconds * 1000); return `${String(Math.floor(ms / 3600000)).padStart(2, '0')}:${String(Math.floor(ms / 60000) % 60).padStart(2, '0')}:${String(Math.floor(ms / 1000) % 60).padStart(2, '0')}${vtt ? '.' : ','}${String(ms % 1000).padStart(3, '0')}`;
 }
-export async function render(p, {full = false, seconds = 20, replace = false} = {}) {
+export async function render(p, {full = false, draft = false, seconds = 20, replace = false} = {}) {
   // A preview never loads media or paints frames belonging only to the unfinished tail.
   if (!full) p = loadProject(p.file, {seconds});
   const out = outputDir(p), lock = path.join(out, 'render.lock');
@@ -196,7 +196,7 @@ export async function render(p, {full = false, seconds = 20, replace = false} = 
     catch (e) { if (e.code !== 'ESRCH') throw e; fs.unlinkSync(lock); }
   }
   const fd = fs.openSync(lock, 'wx'); fs.writeFileSync(fd, JSON.stringify({pid: process.pid})); fs.closeSync(fd);
-  const kind = full ? 'film' : 'preview', target = path.join(out, `${kind}.mp4`), reportPath = path.join(out, `${kind}-report.json`);
+  const kind = draft ? 'draft' : full ? 'film' : 'preview', target = path.join(out, `${kind}.mp4`), reportPath = path.join(out, `${kind}-report.json`);
   const duration = Math.min(p.duration, full ? p.duration : seconds), count = Math.ceil(duration * p.fps - 1e-6);
   const done = value => save(path.join(out, 'checkpoint.json'), {stage: value, kind, fingerprint: p.fingerprint, pid: process.pid, updated_at: new Date().toISOString()});
   try {
@@ -249,7 +249,7 @@ export async function render(p, {full = false, seconds = 20, replace = false} = 
     fs.writeFileSync(path.join(out, `${kind}-contact-sheet.png`), sheet.toBuffer('image/png'));
     const info = probe(target), report = {fingerprint: p.fingerprint, preview_seconds: full ? null : duration, output: target, output_sha256: hashFile(target), original_voice_sha256: hashFile(p.voicePath), original_voice_duration: p.voiceDuration, voice_rate: 'unchanged; leading/trailing padding only', frames: count, duration: Number(info.format.duration), cache_hits: reused, shot_count: clips.length, full_decode: 'pass', caption_count: cues.length, human_review: 'required; technical checks are not acceptance', inputs: p.inputs};
     report.local_motion = motionEvidence;
-    report.audio_tracks = {ambience: p.ambience.length, dialogue: p.dialogue.length, file_sfx: p.sfx.filter(s => s.kind === 'file').length, cuts: p.audio_cuts.length};
+    report.audio_tracks = {ambience: p.ambience.length, ...(p.style === 'B3' && p.score.length ? {score: p.score.length} : {}), dialogue: p.dialogue.length, file_sfx: p.sfx.filter(s => s.kind === 'file').length, cuts: p.audio_cuts.length};
     if (p.style === 'B4') {
       report.voice_trim_start_seconds = p.voiceTrimStart;
       report.voice_rate = 'unchanged; explicit leading source trim/padding only';
